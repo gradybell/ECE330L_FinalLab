@@ -159,9 +159,8 @@ int main(void)
   /*** Configure ADC1 ***/
   RCC->APB2ENR |= 1<<8;  // Turn on ADC1 clock by forcing bit 8 to 1 while keeping other bits unchanged
   ADC1->SMPR2 |= 1; // 15 clock cycles per sample
-  ADC1->CR2 |= 1;        // Turn on ADC1 by forcing bit 0 to 1 while keeping other bits unchanged
-  ADC1->SQR3 = 1; // select ADC channel 1 for potentiometer
-
+  ADC1->CR2 |= 1; // Turn on ADC1 by forcing bit 0 to 1 while keeping other bits unchanged
+  ADC1->CR1 = 1<<8; // Set ADC1 to scan mode to use two potentiometers
 
   /*****************************************************************************************************
   These commands are handled as part of the MX_TIM7_Init() function and don't need to be enabled
