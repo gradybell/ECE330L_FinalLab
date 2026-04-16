@@ -7,7 +7,8 @@
 /* Input variables */
 int switches_in = 0; // slider switch (PC0) used to toggle cursor between horizontal (0) and vertical (1)
 int pushButton_in = 0; // pushbutton (PC10) used to execute action (place boat & fire)
-int pot_in = 0; // potentiometer (PA1) used to control cursor
+int potHorizontal_in = 0; // potentiometer (PA1) used to control horizontal cursor movement
+int potVertical_in = 0; // potentiometer (PA2) used to control vertical cursor movement
 
 /* Output variables */
 /*****************************/
@@ -25,7 +26,7 @@ typedef enum LEDstate {off = 0, dim = 1, bright = 2, blink = 3} LEDstate;
 static int timer = 0; // used to control game timing
 
 /* Data structure */
-typedef struct bitMap {
+typedef struct {
 	LEDstate horizontal_bitMap[3][8]; // 2D array of integers corresponding to the horizontal LEDs on the 7SEG display
 	LEDstate vertical_bitMap[2][16]; // 2D array of integers corresponding to the vertical LEDs on the 7SEG display
 	char hits; // track number of hits on board
@@ -35,31 +36,61 @@ typedef struct bitMap {
 } bitMap;
 
 /**
- *  Instances of maps 
+ *  Instances of maps
  */
 /* Player One */
-bitMap playerOneShipBoard;
-playerOneShipBoard.hits = 0;
-playerOneShipBoard.misses = 0;
-playerOneShipBoard.singleBoatsRemaining = 3;
-playerOneShipBoard.doubleBoatsRemaining = 2;
-bitMap playerOneTargetBoard;
-playerOneTargetBoard.hits = 0;
-playerOneTargetBoard.misses = 0;
-playerOneTargetBoard.singleBoatsRemaining = 3;
-playerOneTargetBoard.doubleBoatsRemaining = 2;
+bitMap playerOneShipBoard = {
+	.hits = 0,
+	.misses = 0,
+	.singleBoatsRemaining = 3,
+	.doubleBoatsRemaining = 2,
+	.horizontal_bitMap = {
+		{ off, off, bright, bright, bright, bright, off, off },
+		{ off, off, bright, bright, bright, bright, off, off },
+		{ off, off, bright, bright, bright, bright, off, off },
+	},
+	.vertical_bitMap = { 0 }
+};
+
+bitMap playerOneTargetBoard = {
+	.hits = 0,
+	.misses = 0,
+	.singleBoatsRemaining = 3,
+	.doubleBoatsRemaining = 2,
+	.horizontal_bitMap = {
+		{ off, off, bright, bright, bright, bright, off, off },
+		{ off, off, bright, bright, bright, bright, off, off },
+		{ off, off, bright, bright, bright, bright, off, off },
+	},
+	.vertical_bitMap = { 0 }
+};
 
 /* Player Two */
-bitMap playerTargetShipBoard;
-playerTargetShipBoard.hits = 0;
-playerTargetShipBoard.misses = 0;
-playerTargetShipBoard.singleBoatsRemaining = 3;
-playerTargetShipBoard.doubleBoatsRemaining = 2;
-bitMap playerTargetTargetBoard;
-playerTargetTargetBoard.hits = 0;
-playerTargetTargetBoard.misses = 0;
-playerTargetTargetBoard.singleBoatsRemaining = 3;
-playerTargetTargetBoard.doubleBoatsRemaining = 2;
+bitMap playerTwoShipBoard = {
+	.hits = 0,
+	.misses = 0,
+	.singleBoatsRemaining = 3,
+	.doubleBoatsRemaining = 2,
+	.horizontal_bitMap = {
+		{ off, off, bright, bright, bright, bright, off, off },
+		{ off, off, bright, bright, bright, bright, off, off },
+		{ off, off, bright, bright, bright, bright, off, off },
+	},
+	.vertical_bitMap = { 0 }
+};
+
+bitMap playerTwoTargetBoard = {
+	.hits = 0,
+	.misses = 0,
+	.singleBoatsRemaining = 3,
+	.doubleBoatsRemaining = 2,
+	.horizontal_bitMap = {
+		{ off, off, bright, bright, bright, bright, off, off },
+		{ off, off, bright, bright, bright, bright, off, off },
+		{ off, off, bright, bright, bright, bright, off, off },
+	},
+	.vertical_bitMap = { 0 }
+};
 
 //////////////////////////////////
 ////// Function Definitions //////
@@ -82,7 +113,11 @@ int input(void) {
 		ADC1->CR2 |= 1<<30;
 		HAL_Delay(1);
 		if (ADC1->SR & 1<<1) { // check for conversion completed
-			pot_in = (ADC1->DR);
+			potHorizontal_in = (ADC1->DR);
+		}
+		HAL_Delay(2500);
+		if (ADC1->SR & 1<<1) { // check for conversion completed
+			potVertical_in = (ADC1->DR);
 		}
 
 	return 0;
@@ -133,7 +168,9 @@ int logic (void) {
  */
 int output (void) {
 
-	GPIOD->ODR = pot_in; // TODO delete this (for testing only)
+	GPIOD->ODR = potHorizontal_in; // TODO delete this (for testing only)
+	HAL_Delay(5000);
+	GPIOD->ODR = potVertical_in;
 
 	return 0;
 }
@@ -160,4 +197,5 @@ int game(void) {
 
 void drawBoard(struct bitMap) {
 
+	return 0;
 }
