@@ -28,10 +28,38 @@ static int timer = 0; // used to control game timing
 typedef struct bitMap {
 	LEDstate horizontal_bitMap[3][8]; // 2D array of integers corresponding to the horizontal LEDs on the 7SEG display
 	LEDstate vertical_bitMap[2][16]; // 2D array of integers corresponding to the vertical LEDs on the 7SEG display
+	char hits; // track number of hits on board
+	char misses; // track number of misses on board
+	char singleBoatsRemaining; // track number of remaining single-spaced boats
+	char doubleBoatsRemaining; // track number of remaining double-spaced boats
 } bitMap;
 
-/* Instances of maps */
-bitMap playerOneShipBoard, playerOneTargetBoard, playerTwoShipBoard, playerTwoTargetBoard;
+/**
+ *  Instances of maps 
+ */
+/* Player One */
+bitMap playerOneShipBoard;
+playerOneShipBoard.hits = 0;
+playerOneShipBoard.misses = 0;
+playerOneShipBoard.singleBoatsRemaining = 3;
+playerOneShipBoard.doubleBoatsRemaining = 2;
+bitMap playerOneTargetBoard;
+playerOneTargetBoard.hits = 0;
+playerOneTargetBoard.misses = 0;
+playerOneTargetBoard.singleBoatsRemaining = 3;
+playerOneTargetBoard.doubleBoatsRemaining = 2;
+
+/* Player Two */
+bitMap playerTargetShipBoard;
+playerTargetShipBoard.hits = 0;
+playerTargetShipBoard.misses = 0;
+playerTargetShipBoard.singleBoatsRemaining = 3;
+playerTargetShipBoard.doubleBoatsRemaining = 2;
+bitMap playerTargetTargetBoard;
+playerTargetTargetBoard.hits = 0;
+playerTargetTargetBoard.misses = 0;
+playerTargetTargetBoard.singleBoatsRemaining = 3;
+playerTargetTargetBoard.doubleBoatsRemaining = 2;
 
 //////////////////////////////////
 ////// Function Definitions //////
