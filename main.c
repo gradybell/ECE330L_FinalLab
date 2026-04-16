@@ -160,6 +160,7 @@ int main(void)
   RCC->APB2ENR |= 1<<8;  // Turn on ADC1 clock by forcing bit 8 to 1 while keeping other bits unchanged
   ADC1->SMPR2 |= 1; // 15 clock cycles per sample
   ADC1->CR2 |= 1;        // Turn on ADC1 by forcing bit 0 to 1 while keeping other bits unchanged
+  ADC1->SQR3 = 1; // select ADC channel 1 for potentiometer
 
 
   /*****************************************************************************************************
@@ -178,7 +179,9 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  game();
+
+  game(); // all game logic exists in another file, "battleship" so that main.c is not messy
+
 //  while (1)
 //  {
 //	  int i,j;
