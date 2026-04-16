@@ -184,7 +184,9 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
-	handle_interrupts();
+
+	handle_interrupts(); // call back to battleship.c to hand interrupts
+
 COUNT++;  // Increment note duration counter
 Vibrato_Count++; // Increment the note vibrato effect counter
 
