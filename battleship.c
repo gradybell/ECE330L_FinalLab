@@ -23,7 +23,7 @@ typedef enum player {playerOne = 0, playerTwo = 1} player;
 
 typedef enum LEDstate {off = 0, dim = 1, bright = 2, blink = 3} LEDstate;
 
-static int timer = 0; // used to control game timing
+static int timer = 0; // used to control PWM
 
 /* Data structure */
 typedef struct {
@@ -45,11 +45,17 @@ bitMap playerOneShipBoard = {
 	.singleBoatsRemaining = 3,
 	.doubleBoatsRemaining = 2,
 	.horizontal_bitMap = {
-		{ off, off, bright, bright, bright, bright, off, off },
-		{ off, off, bright, bright, bright, bright, off, off },
-		{ off, off, bright, bright, bright, bright, off, off },
+		{ off, dim, bright, blink, off, dim, bright, blink },
+		{ dim, off, bright, bright, dim, bright, bright, off },
+		{ off, off, bright, dim, bright, off, bright, off, },
 	},
-	.vertical_bitMap = { 0 }
+	.vertical_bitMap = {
+		{ off, bright, off, dim, bright, dim, off, bright,
+		  bright, off, dim, dim, off, dim, bright, off },
+
+	    { off, off, off, dim, off, dim, off, bright,
+	      bright, off, bright, dim, bright, dim, bright, off },
+	}
 };
 
 bitMap playerOneTargetBoard = {
@@ -92,33 +98,36 @@ bitMap playerTwoTargetBoard = {
 	.vertical_bitMap = { 0 }
 };
 
+///////////////////////////////////
+////// Function Declarations //////
+///////////////////////////////////
+
+void drawBoard(bitMap m);
+
 //////////////////////////////////
 ////// Function Definitions //////
 //////////////////////////////////
 
 /**
- * Process inputs from switches, pushbuttons, and potentiometer
+ * Process inputs from switches, pushbuttons, and potentiometers
  */
 int input(void) {
 
 	switches_in = GPIOC->IDR & 1; // parse only the rightmost switch (PC0)
 	pushButton_in = (GPIOC->IDR >> 10) & 1; // parse only the switch connected to PC10
 
-	/* read potentiometer  */
-		HAL_Delay(1);
-		/*
-		 * Start a conversion on ADC1 by forcing bit 30 in CR2 to
-		 * 1 while keeping other bits unchanged
-		 */
-		ADC1->CR2 |= 1<<30;
-		HAL_Delay(1);
-		if (ADC1->SR & 1<<1) { // check for conversion completed
-			potHorizontal_in = (ADC1->DR);
-		}
-		HAL_Delay(2500);
-		if (ADC1->SR & 1<<1) { // check for conversion completed
-			potVertical_in = (ADC1->DR);
-		}
+	/* read potentiometers */
+		// Horizontal
+		ADC1->SQR3 = 1; // select channel 1
+		ADC1->CR2 |= 1<<30; // start sequence of reading & converting channel 1
+		HAL_Delay(40);
+		potHorizontal_in = ADC1->DR << 1; // read value from potentiometer at PA1
+
+		// Vertical
+		ADC1->SQR3 = 2; // select channel 2
+		ADC1->CR2 |= 1<<30; // start sequence of reading & converting channel 2
+		HAL_Delay(40);
+		potVertical_in = ADC1->DR << 1; // read value from potentiometer at PA2
 
 	return 0;
 }
@@ -131,36 +140,36 @@ int logic (void) {
 	// process raw inputs
 
 	// game logic
-	switch (gameState) { // game state dependent logic
-
-		case title:
-
-			break;
-
-		case playerOneStart:
-
-			break;
-
-		case playerTwoStart:
-
-			break;
-
-		case playerOneTurn:
-
-			break;
-
-		case playerTwoTurn:
-
-			break;
-
-		case endGame:
-
-			break;
-	}
-
-	// prepare outputs
-
-	return 0;
+//	switch (gameState) { // game state dependent logic
+//
+//		case title:
+//
+//			break;
+//
+//		case playerOneStart:
+//
+//			break;
+//
+//		case playerTwoStart:
+//
+//			break;
+//
+//		case playerOneTurn:
+//
+//			break;
+//
+//		case playerTwoTurn:
+//
+//			break;
+//
+//		case endGame:
+//
+//			break;
+//	}
+//
+//	// prepare outputs
+//
+//	return 0;
 }
 
 /**
@@ -168,9 +177,7 @@ int logic (void) {
  */
 int output (void) {
 
-	GPIOD->ODR = potHorizontal_in; // TODO delete this (for testing only)
-	HAL_Delay(5000);
-	GPIOD->ODR = potVertical_in;
+	drawBoard(playerOneShipBoard);
 
 	return 0;
 }
@@ -195,7 +202,42 @@ int game(void) {
 //////////// Helpers ////////////
 /////////////////////////////////
 
-void drawBoard(struct bitMap) {
+void drawBoard(bitMap m) {
 
-	return 0;
+	char seg[8] = { 0 };
+
+	// set the horizontal segments
+	for (int i = 0; i < 8; i++)
+	{
+
+		// set the top segments
+		switch(m.horizontal_bitMap[0][i]) {
+		case off: break;
+		case dim:
+			if ((timer % 3 == 0) | (timer % 3 == 1))
+				seg[i] |= 1;
+			break;
+		case bright:
+			seg[i] |= 1;
+			break;
+		case blink:
+			if (timer % 8 == 0)
+				seg[i] |= 1;
+			break;
+		}
+
+		// set the middle segments
+		switch(m.horizontal_bitMap[1][i]) {}
+
+		// set the bottom segments
+		switch(m.horizontal_bitMap[2][i]) {}
+	}
+
+	for (char display = 0; display < 8; display++) {
+		GPIOE->ODR = ((0xFF00 | ~seg[7-display]) & ~(1<<(display+8))) | 0x80;
+	}
+
+	// Set all selects high to latch-in character
+	GPIOE->ODR |= 0xFF00;
+	return;
 }
