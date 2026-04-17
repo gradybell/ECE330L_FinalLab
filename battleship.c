@@ -45,10 +45,9 @@ bitMap playerOneShipBoard = {
 	.singleBoatsRemaining = 3,
 	.doubleBoatsRemaining = 2,
 	.horizontal_bitMap = {
-//		{ off, off, off, off, off, off, off, off }, // top segment
-//		{ blink, blink, blink, blink, blink, blink, blink, blink }, // middle segment
-//		{ bright, bright, bright, bright, dim, dim, dim, dim, }, // bottom segment
-			0
+		{ off, off, off, off, off, off, off, off }, // top segment
+		{ blink, blink, blink, blink, blink, blink, blink, blink }, // middle segment
+		{ bright, bright, bright, bright, dim, dim, dim, dim, }, // bottom segment
 	},
 	.vertical_bitMap = {
 		{ blink, dim, bright, dim, bright, dim, bright, dim,
