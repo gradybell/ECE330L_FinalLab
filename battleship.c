@@ -51,11 +51,11 @@ bitMap playerOneShipBoard = {
 			0
 	},
 	.vertical_bitMap = {
-		{ bright, bright, bright, bright, bright, bright, bright, bright,
-		  bright, bright, bright, bright, bright, bright, bright, bright, }, // top segments
+		{ blink, dim, bright, dim, bright, dim, bright, dim,
+		  bright, off, bright, off, bright, off, bright, off, }, // top segments
 
-//	    { dim, dim, dim, dim, off, off, off, off,
-//	      bright, bright, bright, bright, dim, dim, dim, dim }, // bottom segments
+	    { dim, dim, dim, dim, off, off, off, off,
+	      bright, bright, bright, bright, dim, dim, dim, dim }, // bottom segments
 	}
 };
 
@@ -262,77 +262,77 @@ void drawBoard(bitMap m) {
 		}
 	}
 
-	/* set the vertical segments */
-	for (int i = 0; i < 16; i++)	{
+	/* set vertical segments */
+	for (int i = 0; i < 16; i++) {
+		/* left */
+		// set the top left segments
+		switch(m.vertical_bitMap[0][i]) {
+			case off:
+				break;
+			case dim:
+				if (timer % 3 == 0) // revisit to get dim
+					seg[i/2] |= 1<<5;
+				break;
+			case bright:
+				seg[i/2] |= 1<<5;
+				break;
+			case blink:
+				if (timer % 9 == 0)
+					seg[i/2] |= 1<<5;
+				break;
+		}
 
-		if (i % 2 == 0) {
-			// set the top left segments
-			switch(m.vertical_bitMap[0][i]) {
-				case off:
-					break;
-				case dim:
-					if (timer % 3 == 0) // revisit to get dim
-						seg[i] |= 1<<5;
-					break;
-				case bright:
-					seg[i] |= 1<<5;
-					break;
-				case blink:
-					if (timer % 9 == 0)
-						seg[i] |= 1<<5;
-					break;
-			}
+		// set the bottom left segments
+		switch(m.vertical_bitMap[1][i]) {
+			case off:
+				break;
+			case dim:
+				if (timer % 3 == 0) // revisit to get dim
+					seg[i/2] |= 1<<4;
+				break;
+			case bright:
+				seg[i/2] |= 1<<4;
+				break;
+			case blink:
+				if (timer % 9 == 0)
+					seg[i/2] |= 1<<4;
+				break;
+		}
 
-			// set the bottom left segments
-			switch(m.vertical_bitMap[1][i]) {
-				case off:
-					break;
-				case dim:
-					if (timer % 3 == 0) // revisit to get dim
-						seg[i] |= 1<<4;
-					break;
-				case bright:
-					seg[i] |= 1<<4;
-					break;
-				case blink:
-					if (timer % 9 == 0)
-						seg[i] |= 1<<4;
-					break;
-			}
-		} else {
-			// set the top right segments
-			switch(m.vertical_bitMap[0][i]) {
-				case off:
-					break;
-				case dim:
-					if (timer % 3 == 0) // revisit to get dim
-						seg[i] |= 1<<1;
-					break;
-				case bright:
-					seg[i] |= 1<<1;
-					break;
-				case blink:
-					if (timer % 9 == 0)
-						seg[i] |= 1<<1;
-					break;
-			}
+		/* right */
+		i++;
+		// set the top right segments
+		switch(m.vertical_bitMap[0][i]) {
+			case off:
+				break;
+			case dim:
+				if (timer % 3 == 0) // revisit to get dim
+					seg[i/2] |= 1<<1;
+				break;
+			case bright:
+				seg[i/2] |= 1<<1;
+				break;
+			case blink:
+				if (timer % 9 == 0)
+					seg[i/2] |= 1<<1;
+				break;
+		}
 
-			// set the bottom right segments
-			switch(m.vertical_bitMap[1][i]) {
-				case off:
-					break;
-				case dim:
-					if (timer % 3 == 0) // revisit to get dim
-						seg[i] |= 1<<2;
-					break;
-				case bright:
-					seg[i] |= 1<<2;
-					break;
-				case blink:
-					if (timer % 9 == 0)
-						seg[i] |= 1<<2;
-					break;
-			}
+		// set the bottom right segments
+		switch(m.vertical_bitMap[1][i]) {
+			case off:
+				break;
+			case dim:
+				if (timer % 3 == 0) // revisit to get dim
+					seg[i/2] |= 1<<2;
+				break;
+			case bright:
+				seg[i/2] |= 1<<2;
+				break;
+			case blink:
+				if (timer % 9 == 0)
+					seg[i/2] |= 1<<2;
+				break;
 		}
 	}
 
