@@ -197,8 +197,6 @@ unsigned char _7SEG_ASCII[]=
 };
 #endif
 
-
-
 void Seven_Segment_Digit (unsigned char digit, unsigned char hex_char, unsigned char dot)
 {
 /*******************************************************************************
