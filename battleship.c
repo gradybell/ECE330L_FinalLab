@@ -263,6 +263,13 @@ void drawBoard(bitMap m) {
 	}
 
 	/* set vertical segments */
+	/**
+	 * Iterate through each column of the vertical bitmap array and
+	 * set the appropriate bits at seg[i/2] so that the 16 bit vertical
+	 * array is mapped to the 8 bit character array, for which each
+	 * character contains the information of both the left and right
+	 * vertical segments
+	 */
 	for (int i = 0; i < 16; i++) {
 		/* left */
 		// set the top left segments
