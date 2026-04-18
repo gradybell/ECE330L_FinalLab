@@ -1,12 +1,14 @@
 #include "battleship.h"
 
-//////////////////////////////////
-////////////// Data //////////////
-//////////////////////////////////
+	//////////////////////////////////
+	////////////// Data //////////////
+	//////////////////////////////////
+
+static int timer = 0; // used to control PWM
 
 /* Input variables */
-int switches_in = 0; // slider switch (PC0) used to toggle cursor between horizontal (0) and vertical (1)
-int pushButton_in = 0; // pushbutton (PC10) used to execute action (place boat & fire)
+int actionButton_in = 0; // push button 10 (PC10) used to execute action (place boat & fire)
+int toggleButton_in = 0; // push button 11 (PC11) used to toggle cursor between horizontal (0) and vertical (1)
 int potHorizontal_in = 0; // potentiometer (PA1) used to control horizontal cursor movement
 int potVertical_in = 0; // potentiometer (PA2) used to control vertical cursor movement
 
@@ -18,20 +20,21 @@ int potVertical_in = 0; // potentiometer (PA2) used to control vertical cursor m
 /* Enumerated variables */
 typedef enum gameState {title = 0, playerOneStart = 1, playerTwoStart = 2,
 						playerOneTurn = 3, playerTwoTurn = 4, endGame = 5} gameState; // represents all states the game can be in
-
-						gameState currGameState = title; // TODO change back to title
+						gameState currGameState = title; // start the game at the title sequence
 
 typedef enum player {playerOne = 0, playerTwo = 1} player;
+					 player currPlayer = playerOne; // start with player one
+
+typedef enum cursorOrient {horizontalCursor = 0, verticalCursor = 1} cursorOrient;
+				   	       cursorOrient currCursorOrient = horizontalCursor; // start the cursor in a horizontal orientation
 
 typedef enum LEDstate {off = 0, dim = 1, bright = 2, blink = 3} LEDstate;
-
-static int timer = 0; // used to control PWM
+					   LEDstate currCursor = blink; // the cursor will always blink
 
 /* Data structure */
 typedef struct {
 	LEDstate horizontal_bitMap[3][8]; // 2D array of integers corresponding to the horizontal LEDs on the 7SEG display
 	LEDstate vertical_bitMap[2][16]; // 2D array of integers corresponding to the vertical LEDs on the 7SEG display
-	LEDstate cursor; // blinking cursor
 	char hits; // track number of hits on board
 	char misses; // track number of misses on board
 	char singleBoatsRemaining; // track number of remaining single-spaced boats
@@ -54,7 +57,6 @@ bitMap playerOneShipBoard = {
 			{ dim, dim, bright, off, dim, off, bright, off,
 			  off, off, off, off, bright, off, bright, bright }
 	},
-	.cursor = blink,
 	.hits = 0,
 	.misses = 0,
 	.singleBoatsRemaining = 3,
@@ -64,7 +66,6 @@ bitMap playerOneShipBoard = {
 bitMap playerOneTargetBoard = {
 	.horizontal_bitMap = { 0 },
 	.vertical_bitMap = { 0 },
-	.cursor = blink,
 	.hits = 0,
 	.misses = 0,
 	.singleBoatsRemaining = 3,
@@ -75,7 +76,6 @@ bitMap playerOneTargetBoard = {
 bitMap playerTwoShipBoard = {
 	.horizontal_bitMap = { 0 },
 	.vertical_bitMap = { 0 },
-	.cursor = blink,
 	.hits = 0,
 	.misses = 0,
 	.singleBoatsRemaining = 3,
@@ -85,7 +85,6 @@ bitMap playerTwoShipBoard = {
 bitMap playerTwoTargetBoard = {
 	.horizontal_bitMap = { 0 },
 	.vertical_bitMap = { 0 },
-	.cursor = blink,
 	.hits = 0,
 	.misses = 0,
 	.singleBoatsRemaining = 3,
@@ -95,27 +94,37 @@ bitMap playerTwoTargetBoard = {
 bitMap cursorBoard = {
 	.horizontal_bitMap = { 0 },
 	.vertical_bitMap = { 0 },
-	.cursor = blink
 };
 
-///////////////////////////////////
-////// Function Declarations //////
-///////////////////////////////////
+	///////////////////////////////////
+	////// Function Declarations //////
+	///////////////////////////////////
 
-void drawBoard(bitMap m);
+bitMap cursorPosition(int hPot, int vPot, enum cursorOrient orient);
 bitMap compileBoard(bitMap cursor, bitMap map);
+void drawBoard(bitMap m);
 
-//////////////////////////////////
-////// Function Definitions //////
-//////////////////////////////////
+	//////////////////////////////////
+	////// Function Definitions //////
+	//////////////////////////////////
 
 /**
- * Process inputs from switches, pushbuttons, and potentiometers
+ * Process inputs from push buttons and potentiometers
  */
 int input(void) {
+	actionButton_in = (GPIOC->IDR >> 10) & 1; // parse only the switch connected to PC10
+	toggleButton_in = (GPIOC->IDR >> 11) & 1; // parse only the switch connected to PC11
 
-	switches_in = GPIOC->IDR & 1; // parse only the rightmost switch (PC0)
-	pushButton_in = (GPIOC->IDR >> 10) & 1; // parse only the switch connected to PC10
+	/* set orientation of cursor */
+	if (!(toggleButton_in & 1)) {
+		if (!(currCursorOrient & 1)) { // the cursor is horizontal
+			currCursorOrient = verticalCursor;
+			HAL_Delay(10);
+		} else {
+			currCursorOrient = horizontalCursor;
+			HAL_Delay(10);
+		}
+	}
 
 	/* read potentiometers */
 		// Horizontal
@@ -141,7 +150,7 @@ int logic (void) {
 	// process raw inputs
 
 	// game logic
-	switch (currGameState) { // game state dependent logic
+	switch (currGameState) {
 
 		case title:
 
@@ -178,10 +187,11 @@ int logic (void) {
  */
 int output (void) {
 
-	drawBoard(cursorPosition(potHorizontal_in, potVertical_in, switches_in));
+	GPIOD->ODR = toggleButton_in<<2 | actionButton_in;
+	drawBoard(cursorPosition(potHorizontal_in, potVertical_in, currCursorOrient));
 //	compileBoard(cursorBoard, playerOneShipBoard);
 
-	switch (currGameState) { // game state dependent logic
+	switch (currGameState) {
 
 		case title:
 
@@ -227,15 +237,96 @@ int game(void) {
 	}
 }
 
-/////////////////////////////////
-//////////// Helpers ////////////
-/////////////////////////////////
+	/////////////////////////////////
+	//////////// Helpers ////////////
+	/////////////////////////////////
+/**
+ * This method reads potentiometer values to set the cursor position.
+ * It does this by checking the orientation of the cursor, then
+ * moving through conditional checks to allow even ranges for the
+ * potentiometers to sweep through for given positions
+ */
+bitMap cursorPosition(int hPot, int vPot, enum cursorOrient orient) {
+	bitMap cursorBoard = {
+			.horizontal_bitMap = { 0 },
+			.vertical_bitMap = { 0 }
+	};
+	int col, row;
 
-bitMap cursorPosition(int hPot, int vPot, int sw) {
-	bitMap cursorBoard;
-	cursorBoard.horizontal_bitMap = { 0 };
-	cursorBoard.vertical_bitMap = { 0 };
-		
+	/* determine column & row */
+	if (orient == horizontalCursor) { // horizontal segments
+	//horizontal movement
+		if (hPot < 512) { // leftmost position = leftmost segment
+			col = 0;
+		} else if (hPot < 1024) {
+			col = 1;
+		} else if (hPot < 1536) {
+			col = 2;
+		} else if (hPot < 2048) { // middle position = middle segment
+			col = 3;
+		} else if (hPot < 2560) {
+			col = 4;
+		} else if (hPot < 3072) {
+			col = 5;
+		} else if (hPot < 3584) {
+			col = 6;
+		} else { // rightmost position = rightmost segment
+			col = 7;
+		}
+	//vertical movement
+		if (vPot < 1365) { // left position = top
+			row = 0;
+		} else if (vPot < 2730) { // middle position = middle
+			row = 1;
+		} else { // right position = bottom
+			row = 2;
+		}
+
+	} else { // vertical segments
+	//horizontal movement
+		if (hPot < 256) { // leftmost position = leftmost segment
+			col = 0;
+		} else if (hPot < 512) {
+			col = 1;
+		} else if (hPot < 768) {
+			col = 2;
+		} else if (hPot < 1024) {
+			col = 3;
+		} else if (hPot < 1280) {
+			col = 4;
+		} else if (hPot < 1536) {
+			col = 5;
+		} else if (hPot < 1792) {
+			col = 6;
+		} else if (hPot < 2048) { // middle position = middle segment
+			col = 7;
+		} else if (hPot < 2304) {
+			col = 8;
+		} else if (hPot < 2560) {
+			col = 9;
+		} else if (hPot < 2816) {
+			col = 10;
+		} else if (hPot < 3072) {
+			col = 11;
+		} else if (hPot < 3328) {
+			col = 12;
+		} else if (hPot < 3584) {
+			col = 13;
+		} else if (hPot < 3840) {
+			col = 14;
+		} else { // rightmost position = rightmost segment
+			col = 15;
+		}
+	//vertical movement
+		if (vPot < 2048) { // left position = top
+			row = 0;
+		} else { // right position = bottom
+			row = 1;
+		}
+	}
+
+	cursorBoard.horizontal_bitMap[row][col] = currCursor; // set cursor location
+
 	return cursorBoard;
 }
 
@@ -248,10 +339,11 @@ bitMap compileBoard(bitMap cursor, bitMap map) {
 			.singleBoatsRemaining = map.singleBoatsRemaining,
 			.doubleBoatsRemaining = map.doubleBoatsRemaining,
 	};
+
 	/* compile horizontal */
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 8; j++) {
-			if (cursor.horizontal_bitMap[i][j] > 0) {
+			if (cursor.horizontal_bitMap[i][j] & 1) {
 				comp.horizontal_bitMap[i][j] = cursor.horizontal_bitMap[i][j];
 			} else {
 				comp.horizontal_bitMap[i][j] = map.horizontal_bitMap[i][j];
@@ -261,7 +353,7 @@ bitMap compileBoard(bitMap cursor, bitMap map) {
 	/* compile vertical */
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < 16; j++) {
-			if (cursor.vertical_bitMap[i][j] > 0) {
+			if (cursor.vertical_bitMap[i][j] & 1) {
 				comp.vertical_bitMap[i][j] = cursor.vertical_bitMap[i][j];
 			} else {
 				comp.vertical_bitMap[i][j] = map.vertical_bitMap[i][j];
@@ -290,7 +382,7 @@ void drawBoard(bitMap m) {
 				seg[i] |= 1;
 				break;
 			case blink:
-				if (timer % 9 == 0)
+				if (timer % 6 == 0)
 					seg[i] |= 1;
 				break;
 		}
@@ -307,7 +399,7 @@ void drawBoard(bitMap m) {
 				seg[i] |= 1<<6;
 				break;
 			case blink:
-				if (timer % 9 == 0)
+				if (timer % 6 == 0)
 					seg[i] |= 1<<6;
 				break;
 		}
@@ -324,7 +416,7 @@ void drawBoard(bitMap m) {
 				seg[i] |= 1<<3;
 				break;
 			case blink:
-				if (timer % 9 == 0)
+				if (timer % 6 == 0)
 					seg[i] |= 1<<3;
 				break;
 		}
@@ -352,7 +444,7 @@ void drawBoard(bitMap m) {
 				seg[i/2] |= 1<<5;
 				break;
 			case blink:
-				if (timer % 9 == 0)
+				if (timer % 6 == 0)
 					seg[i/2] |= 1<<5;
 				break;
 		}
@@ -369,7 +461,7 @@ void drawBoard(bitMap m) {
 				seg[i/2] |= 1<<4;
 				break;
 			case blink:
-				if (timer % 9 == 0)
+				if (timer % 6 == 0)
 					seg[i/2] |= 1<<4;
 				break;
 		}
@@ -388,7 +480,7 @@ void drawBoard(bitMap m) {
 				seg[i/2] |= 1<<1;
 				break;
 			case blink:
-				if (timer % 9 == 0)
+				if (timer % 6 == 0)
 					seg[i/2] |= 1<<1;
 				break;
 		}
@@ -405,7 +497,7 @@ void drawBoard(bitMap m) {
 				seg[i/2] |= 1<<2;
 				break;
 			case blink:
-				if (timer % 9 == 0)
+				if (timer % 6 == 0)
 					seg[i/2] |= 1<<2;
 				break;
 		}
