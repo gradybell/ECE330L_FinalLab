@@ -13,10 +13,14 @@ int boatToggle_in = 0; // switch 8 (PC0) used to switch from 1 space (0) to 2 sp
 int potHorizontal_in = 0; // potentiometer (PA1) used to control horizontal cursor movement
 int potVertical_in = 0; // potentiometer (PA2) used to control vertical cursor movement
 
+/* Logic variables */
+char playerOneShipsPlaced = 0; // track when player one finishes placing ships
+char playerTwoShipsPlaced = 0; // track when player two finishes placing ships
+char fire = 0; // detect when player has made their move
+char playAgain = 0; // detect if player wants to play again
+
 /* Output variables */
-/*****************************/
-/*** TODO output variables ***/
-/*****************************/
+char displayToggle = 1; // toggle on (1) and off (0) to display message
 
 /* Enumerated variables */
 typedef enum gameState {title = 0, playerOneStart = 1, playerTwoStart = 2,
@@ -28,8 +32,6 @@ typedef enum cursorOrient {horizontalCursor = 0, verticalCursor = 1} cursorOrien
 
 typedef enum LEDstate {off = 0, dim = 1, bright = 2, blink = 3} LEDstate;
 					   LEDstate currCursor = blink; // the cursor will always blink
-
-typedef enum doubleBoatProperties {horizontalDoubleBoat = 0, verticalDoubleBoat = 1} doubleBoadProperties;
 
 /* Data structures */
 /**
@@ -57,24 +59,32 @@ typedef struct {
 										 //	i=2: col
 	char singleBoatsRemaining; // track number of remaining single-spaced boats
 	char doubleBoatsRemaining; // track number of remaining double-spaced boats
-	char hits; // track total number of hits on both boards
-	char misses; // track total number of misses on both boards //TODO delete if unnecessary
+	char hits; // track total number of hits
+	char misses; // track total number of misses	 //TODO delete if unnecessary
 } player;
 
 /* Instances of maps */
 // Player One
 bitMap playerOneShips = {
-	.horizontal_bitMap = { 0 },
+	.horizontal_bitMap = {
+			{ off, off, off, dim, dim, off, off, off },
+			{ off, off, off, bright, bright, off, off, off },
+			{ off, off, off, blink, blink, off, off, off },
+	},
+//	{ off, off, off, dim, dim, off, off, off },
+//	{ off, off, off, bright, bright, off, off, off },
+//	{ off, off, off, blink, blink, off, off, off },
+
 	.vertical_bitMap = { 0 }
 };
-
 // Player Two
 bitMap playerTwoShips = {
 	.horizontal_bitMap = { 0 },
 	.vertical_bitMap = { 0 }
 };
 
-//Instance of players 1
+/* Instance of players 1 */
+// Player One
 player playerOne = {
 		.ownMap = &playerOneShips,
 		.opponentMap = &playerTwoShips,
@@ -83,8 +93,7 @@ player playerOne = {
 		.hits = 0,
 		.misses = 0
 };
-
-//Instance of players 2
+// Player Two
 player playerTwo = {
 		.ownMap = &playerTwoShips,
 		.opponentMap = &playerOneShips,
@@ -102,7 +111,6 @@ bitMap cursorPosition(int hPot, int vPot, enum cursorOrient orient);
 bitMap compileBoard(bitMap *cursor, bitMap *map);
 void assignIndex_State(char row, char col, bitMap *map, cursorOrient orient, LEDstate state);
 void drawBoard(bitMap *map);
-void placeBoat();
 
 	//////////////////////////////////
 	////// Function Definitions //////
@@ -154,27 +162,51 @@ int logic (void) {
 	switch (currGameState) {
 
 		case title:
-
+			currGameState = playerOneStart;
 			break;
 
 		case playerOneStart:
-
+			while (playerOneShipsPlaced & 0) {
+//TODO logic
+			}
+			playerOneShipsPlaced = 1;
+			currGameState = playerTwoStart;
 			break;
 
 		case playerTwoStart:
-
+			while (playerTwoShipsPlaced & 0) {
+//TODO logic
+			}
+			playerTwoShipsPlaced = 1;
+			currGameState = playerOneTurn;
 			break;
 
 		case playerOneTurn:
-
+			while (fire & 0) { // loop until player moves
+//TODO logic
+			}
+			if (playerOne->hits == 7) {
+				currGameState = endGame; // game ends
+				break;
+			}
+			currGameState = playerTwoTurn; // toggle  to player two
 			break;
 
 		case playerTwoTurn:
-
+			while (fire & 0) { // loop until player moves
+//TODO logic
+			}
+			if (playerTwo->hits == 7) {
+				currGameState = endGame; // game ends
+				break;
+			}
+			currGameState = playerOneTurn; // toggle to player one
 			break;
 
 		case endGame:
-
+			if (playAgain & 1) {
+//TODO logic
+			}
 			break;
 	}
 
@@ -190,22 +222,68 @@ int output (void) {
 
 	/* (TODO delete) TESTING */
 	bitMap cursorBoard = cursorPosition(potHorizontal_in, potVertical_in, currCursorOrient);
-	drawBoard(&cursorBoard);
-
-//	compileBoard(cursorBoard, playerOneShipBoard);
+	bitMap display = compileBoard(&cursorBoard, &playerOneShips);
+	drawBoard(&display);
 
 	switch (currGameState) {
 
 		case title:
+			/* Display Game Title */
+			if (displayToggle & 1) {
+				displayToggle = 0;
+				char MessageTitle[] = // scrolls "Battleship" on Marquee display
+						{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+						CHAR_B, CHAR_A, CHAR_T, CHAR_T, CHAR_L, CHAR_E,
+						CHAR_S, CHAR_H, CHAR_I, CHAR_P,
+						SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+				Animate_On = 1; // turn on animation so that interrupt displays Message[]
+				Message_Pointer = &MessageTitle[0];
+				Save_Pointer = &MessageTitle[0];
+				Message_Length = sizeof(MessageTitle)/sizeof(MessageTitle[0]);
+				Delay_msec = 200;
+				HAL_Delay(5000);           // Delay 5 seconds to allow message to scroll
+				Animate_On = 0;            // Stop scrolling message
+				HAL_Delay(1000);           // Delay 1 second
+			}
 
 			break;
 
 		case playerOneStart:
-			drawBoard(&playerOneShips);
+			/* Display Player One Start Screen*/
+			char MessageP1Start[] = // scrolls "Player One - Place Ships" on Marquee display
+					{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+					CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+					CHAR_O, CHAR_N, CHAR_E, SPACE, DASH, SPACE,
+					CHAR_P, CHAR_L, CHAR_A, CHAR_C, CHAR_E, SPACE,
+					CHAR_S, CHAR_H, CHAR_I, CHAR_P, CHAR_S,
+					SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+			Animate_On = 1; // turn on animation so that interrupt displays Message[]
+			Message_Pointer = &MessageP1Start[0];
+			Save_Pointer = &MessageP1Start[0];
+			Message_Length = sizeof(MessageP1Start)/sizeof(MessageP1Start[0]);
+			Delay_msec = 200;
+			HAL_Delay(10000);          // Delay 10 seconds to allow message to scroll
+			Animate_On = 0;            // Stop scrolling message
+			HAL_Delay(1000);           // Delay 1 second
 			break;
 
 		case playerTwoStart:
-			drawBoard(&playerTwoShips);
+			/* Display Player Two Start Screen*/
+			char MessageP2Start[] = // scrolls "Player Two - Place Ships" on Marquee display
+					{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+					CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+					CHAR_T, CHAR_W, CHAR_O, SPACE, DASH, SPACE,
+					CHAR_P, CHAR_L, CHAR_A, CHAR_C, CHAR_E, SPACE,
+					CHAR_S, CHAR_H, CHAR_I, CHAR_P, CHAR_S,
+					SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+			Animate_On = 1; // turn on animation so that interrupt displays Message[]
+			Message_Pointer = &MessageP2Start[0];
+			Save_Pointer = &MessageP2Start[0];
+			Message_Length = sizeof(MessageP2Start)/sizeof(MessageP2Start[0]);
+			Delay_msec = 200;
+			HAL_Delay(10000);          // Delay 10 seconds to allow message to scroll
+			Animate_On = 0;            // Stop scrolling message
+			HAL_Delay(1000);           // Delay 1 second
 			break;
 
 		case playerOneTurn:
@@ -218,7 +296,38 @@ int output (void) {
 		 * prompt players to restart the game and preserve win record with points? If we have the time
 		 */
 		case endGame:
-
+			/* Display Game End Screen*/
+			if (playerOne->hits == 7) { // player one won
+				char MessageP1Wins[] = // scrolls "Player Two - Place Ships" on Marquee display
+						{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+						CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+						CHAR_O, CHAR_N, CHAR_E, SPACE,
+						CHAR_W, CHAR_I, CHAR_N, CHAR_S,
+						SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+				Animate_On = 1; // turn on animation so that interrupt displays Message[]
+				Message_Pointer = &MessageP1Wins[0];
+				Save_Pointer = &MessageP1Wins[0];
+				Message_Length = sizeof(MessageP1Wins)/sizeof(MessageP1Wins[0]);
+				Delay_msec = 200;
+				HAL_Delay(10000);          // Delay 10 seconds to allow message to scroll
+				Animate_On = 0;            // Stop scrolling message
+				HAL_Delay(1000);           // Delay 1 second
+			} else { // player two won
+				char MessageP2Wins[] = // scrolls "Player Two - Place Ships" on Marquee display
+						{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+						CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+						CHAR_T, CHAR_W, CHAR_O, SPACE,
+						CHAR_W, CHAR_I, CHAR_N, CHAR_S,
+						SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+				Animate_On = 1; // turn on animation so that interrupt displays Message[]
+				Message_Pointer = &MessageP2Wins[0];
+				Save_Pointer = &MessageP2Wins[0];
+				Message_Length = sizeof(MessageP2Wins)/sizeof(MessageP2Wins[0]);
+				Delay_msec = 200;
+				HAL_Delay(10000);          // Delay 10 seconds to allow message to scroll
+				Animate_On = 0;            // Stop scrolling message
+				HAL_Delay(1000);           // Delay 1 second
+			}
 			break;
 	}
 
@@ -525,9 +634,5 @@ void drawBoard(bitMap *map) {
 	// Set all selects high to latch-in character
 	HAL_Delay(2);
 	GPIOE->ODR |= 0xFF00;
-	return;
-}
-void placeBoat() {
-
 	return;
 }
