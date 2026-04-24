@@ -1,0 +1,38 @@
+            /* in battleship.h */
+#include <stdbool.h>
+
+            /* in battleship.c */
+// DELETE HAL_DELAYS!!!!!!!!!!!
+	/* read potentiometers */
+		// Horizontal
+		ADC1->SQR3 = 1; // select channel 1
+		ADC1->CR2 |= 1<<30; // start sequence of reading & converting channel 1
+		while(!(ADC1->SR & 1<<1));
+		potHorizontal_in = ADC1->DR; // read value from potentiometer at PA1
+
+		// Vertical
+		ADC1->SQR3 = 2; // select channel 2
+		ADC1->CR2 |= 1<<30; // start sequence of reading & converting channel 2
+		while(!(ADC1->SR & 1<<1));
+		potVertical_in = ADC1->DR; // read value from potentiometer at PA2
+//**************************************//
+bool dimOn = (timer % 6 == 0);
+	bool blinkOn = ((timer/250) % 2 == 0);
+
+	/* set the horizontal segments */
+	for (int i = 0; i < 8; i++)	{
+
+		// set the top segments
+		switch(map->horizontal_bitMap[0][i]) {
+			case off:
+				break;
+			case dim:
+				seg[i] |= ( dimOn ) ? 1 : 0;
+				break;
+			case bright:
+				seg[i] |= 1;
+				break;
+			case blink:
+				seg[i] |= ( blinkOn ) ? 1 : 0;
+				break;
+		}
