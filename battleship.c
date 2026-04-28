@@ -5,24 +5,33 @@
 	//////////////////////////////////
 
 static int timer = 0; // used to control PWM
+/*** Delay Variables to be used in HAL_Delay ***/
+extern int pushButton_delay = 300;
+extern int displayHold_delay = 1000;
+extern int title_delay = 5000;
+extern int playerStart_delay = 10000;
+extern int round_delay = 2000;
+extern int extRound_delay = 2100;
+extern int winner_delay = 5000;
+extern int endGame_delay = 10000;
 
-/* Input variables */
+/*** Input variables ***/
 int actionButton_in = 0; // push button 10 (PC10) used to execute action (place boat & fire)
 int toggleButton_in = 0; // push button 11 (PC11) used to toggle cursor between horizontal (0) and vertical (1)
 int boatToggle_in = 0; // switch 8 (PC0) used to switch from 1 space (0) to 2 space (1) ships when placing
 int potHorizontal_in = 0; // potentiometer (PA1) used to control horizontal cursor movement
 int potVertical_in = 0; // potentiometer (PA2) used to control vertical cursor movement
 
-/* Logic variables */
+/*** Logic variables ***/
 char playerOneShipsPlaced = 0; // track when player one finishes placing ships
 char playerTwoShipsPlaced = 0; // track when player two finishes placing ships
 char fire = 0; // detect when player has made their move
 char playAgain = 0; // detect if player wants to play again
 
-/* Output variables */
-char displayToggle = 1; // toggle on (1) and off (0) to display message
+/*** Output variables ***/
+char displayToggle = 0; // toggle on (1) and off (0) to display message
 
-/* Enumerated variables */
+/*** Enumerated variables ***/
 typedef enum gameState {title = 0, playerOneStart = 1, playerTwoStart = 2,
 						playerOneTurn = 3, playerTwoTurn = 4, endGame = 5} gameState; // represents all states the game can be in
 						gameState currGameState = title; // start the game at the title sequence
@@ -30,10 +39,13 @@ typedef enum gameState {title = 0, playerOneStart = 1, playerTwoStart = 2,
 typedef enum cursorOrient {horizontalCursor = 0, verticalCursor = 1} cursorOrient;
 				   	       cursorOrient currCursorOrient = horizontalCursor; // start the cursor in a horizontal orientation
 
-typedef enum LEDstate {off = 0, dim = 1, bright = 2, blink = 3} LEDstate;
+typedef enum LEDstate {off = 0, targetMiss = 1, targetHit = 2, blink = 3} LEDstate;
 					   LEDstate currCursor = blink; // the cursor will always blink
 
-/* Data structures */
+typedef enum shipType {singleShip = 0, doubleShip = 1} shipType;
+					   shipType currShipType= singleShip; // start with a single ship
+
+/*** Data structures ***/
 /**
  * Bitmaps are composed of horizontal and vertical components and track hits and misses on the board
  */
@@ -61,21 +73,28 @@ typedef struct {
 	char doubleBoatsRemaining; // track number of remaining double-spaced boats
 	char hits; // track total number of hits
 	char misses; // track total number of misses	 //TODO delete if unnecessary
+	char numWins;
 } player;
 
-/* Instances of maps */
+/*** Instances of maps ***/
 // Player One
 bitMap playerOneShips = {
-	.horizontal_bitMap = {
-			{ off, off, off, dim, dim, off, off, off },
-			{ off, off, off, bright, bright, off, off, off },
-			{ off, off, off, blink, blink, off, off, off },
-	},
-//	{ off, off, off, dim, dim, off, off, off },
-//	{ off, off, off, bright, bright, off, off, off },
-//	{ off, off, off, blink, blink, off, off, off },
-
+	.horizontal_bitMap = { 0 },
 	.vertical_bitMap = { 0 }
+
+//	.horizontal_bitMap = {
+//		{ off, off, off, targetMiss, targetMiss, off, off, off },
+//		{ off, off, off, targetHit, targetHit, off, off, off },
+//		{ off, off, off, blink, blink, off, off, off },
+//	},
+//
+//	.vertical_bitMap = {
+// 		{ off, targetHit, targetHit, off, off, targetMiss, targetMiss, off,
+// 		  targetHit, targetMiss, targetHit, blink, targetHit, targetHit, targetMiss, targetMiss },
+//
+//	   { off, targetHit, targetHit, off, off, targetMiss, targetMiss, off,
+//	     targetHit, off, off, blink, targetHit, targetHit, targetMiss, targetMiss },
+//	}
 };
 // Player Two
 bitMap playerTwoShips = {
@@ -83,7 +102,7 @@ bitMap playerTwoShips = {
 	.vertical_bitMap = { 0 }
 };
 
-/* Instance of players 1 */
+/*** Instance of players ***/
 // Player One
 player playerOne = {
 		.ownMap = &playerOneShips,
@@ -91,7 +110,8 @@ player playerOne = {
 		.singleBoatsRemaining = 3,
 		.doubleBoatsRemaining = 2,
 		.hits = 0,
-		.misses = 0
+		.misses = 0,
+		.numWins = 0
 };
 // Player Two
 player playerTwo = {
@@ -100,7 +120,8 @@ player playerTwo = {
 		.singleBoatsRemaining = 3,
 		.doubleBoatsRemaining = 2,
 		.hits = 0,
-		.misses = 0
+		.misses = 0,
+		.numWins = 0
 };
 
 	///////////////////////////////////
@@ -111,6 +132,9 @@ bitMap cursorPosition(int hPot, int vPot, enum cursorOrient orient);
 bitMap compileBoard(bitMap *cursor, bitMap *map);
 void assignIndex_State(char row, char col, bitMap *map, cursorOrient orient, LEDstate state);
 void drawBoard(bitMap *map);
+
+bitMap placeShips();
+LEDstate fireShot();
 
 	//////////////////////////////////
 	////// Function Definitions //////
@@ -128,10 +152,10 @@ int input(void) {
 	if (toggleButton_in == 0) {
 		if (currCursorOrient == verticalCursor) { // the cursor is horizontal
 			currCursorOrient = horizontalCursor;
-			HAL_Delay(300);
+			HAL_Delay(pushButton_delay);
 		} else {
 			currCursorOrient = verticalCursor;
-			HAL_Delay(300);
+			HAL_Delay(pushButton_delay);
 		}
 	}
 
@@ -139,13 +163,13 @@ int input(void) {
 		// Horizontal
 		ADC1->SQR3 = 1; // select channel 1
 		ADC1->CR2 |= 1<<30; // start sequence of reading & converting channel 1
-		HAL_Delay(40);
+		while(!(ADC1->SR & 1<<1));
 		potHorizontal_in = ADC1->DR; // read value from potentiometer at PA1
 
 		// Vertical
 		ADC1->SQR3 = 2; // select channel 2
 		ADC1->CR2 |= 1<<30; // start sequence of reading & converting channel 2
-		HAL_Delay(40);
+		while(!(ADC1->SR & 1<<1));
 		potVertical_in = ADC1->DR; // read value from potentiometer at PA2
 
 	return 0;
@@ -166,45 +190,49 @@ int logic (void) {
 			break;
 
 		case playerOneStart:
-			while (playerOneShipsPlaced & 0) {
-//TODO logic
+			if (playerOneShipsPlaced == 1) {
+
 			}
-			playerOneShipsPlaced = 1;
 			currGameState = playerTwoStart;
 			break;
 
 		case playerTwoStart:
-			while (playerTwoShipsPlaced & 0) {
+			if (playerTwoShipsPlaced == 1) {
 //TODO logic
 			}
-			playerTwoShipsPlaced = 1;
 			currGameState = playerOneTurn;
 			break;
 
 		case playerOneTurn:
-			while (fire & 0) { // loop until player moves
-//TODO logic
+			if (fire & 1) {
+				fire = 0;
+				if (playerOne.hits == 7) {
+					currGameState = endGame; // game ends
+					break;
+				}
+				currGameState = playerTwoTurn; // toggle  to player two
 			}
-			if (playerOne->hits == 7) {
-				currGameState = endGame; // game ends
-				break;
-			}
-			currGameState = playerTwoTurn; // toggle  to player two
 			break;
 
 		case playerTwoTurn:
-			while (fire & 0) { // loop until player moves
-//TODO logic
+			if (fire & 1) {
+				fire = 0;
+				if (playerTwo.hits == 7) {
+					currGameState = endGame; // game ends
+					break;
+				}
+				currGameState = playerOneTurn; // toggle  to player one
 			}
-			if (playerTwo->hits == 7) {
-				currGameState = endGame; // game ends
-				break;
-			}
-			currGameState = playerOneTurn; // toggle to player one
 			break;
 
 		case endGame:
-			if (playAgain & 1) {
+			if (playerOne.hits == 7) {
+				playerOne.numWins++;
+			} else {
+				playerTwo.numWins++;
+			}
+
+			if (playAgain == 1) {
 //TODO logic
 			}
 			break;
@@ -225,6 +253,7 @@ int output (void) {
 	bitMap display = compileBoard(&cursorBoard, &playerOneShips);
 	drawBoard(&display);
 
+	displayToggle = 0; // set to 1 to toggle Marquee display
 	switch (currGameState) {
 
 		case title:
@@ -241,55 +270,143 @@ int output (void) {
 				Save_Pointer = &MessageTitle[0];
 				Message_Length = sizeof(MessageTitle)/sizeof(MessageTitle[0]);
 				Delay_msec = 200;
-				HAL_Delay(5000);           // Delay 5 seconds to allow message to scroll
+				HAL_Delay(title_delay);           // Delay 5 seconds to allow message to scroll
 				Animate_On = 0;            // Stop scrolling message
-				HAL_Delay(1000);           // Delay 1 second
+				HAL_Delay(displayHold_delay);           // Delay 1 second
 			}
 
 			break;
 
 		case playerOneStart:
 			/* Display Player One Start Screen*/
-			char MessageP1Start[] = // scrolls "Player One - Place Ships" on Marquee display
-					{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-					CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
-					CHAR_O, CHAR_N, CHAR_E, SPACE, DASH, SPACE,
-					CHAR_P, CHAR_L, CHAR_A, CHAR_C, CHAR_E, SPACE,
-					CHAR_S, CHAR_H, CHAR_I, CHAR_P, CHAR_S,
-					SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
-			Animate_On = 1; // turn on animation so that interrupt displays Message[]
-			Message_Pointer = &MessageP1Start[0];
-			Save_Pointer = &MessageP1Start[0];
-			Message_Length = sizeof(MessageP1Start)/sizeof(MessageP1Start[0]);
-			Delay_msec = 200;
-			HAL_Delay(10000);          // Delay 10 seconds to allow message to scroll
-			Animate_On = 0;            // Stop scrolling message
-			HAL_Delay(1000);           // Delay 1 second
+			if (displayToggle & 1) {
+				displayToggle = 0;
+				char MessageP1Start[] = // scrolls "Player One - Place Ships" on Marquee display
+						{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+						CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+						CHAR_1, SPACE, DASH, SPACE,
+						CHAR_P, CHAR_L, CHAR_A, CHAR_C, CHAR_E, SPACE,
+						CHAR_S, CHAR_H, CHAR_I, CHAR_P, CHAR_S,
+						SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+				Animate_On = 1; // turn on animation so that interrupt displays Message[]
+				Message_Pointer = &MessageP1Start[0];
+				Save_Pointer = &MessageP1Start[0];
+				Message_Length = sizeof(MessageP1Start)/sizeof(MessageP1Start[0]);
+				Delay_msec = 200;
+				HAL_Delay(playerStart_delay);          // Delay 10 seconds to allow message to scroll
+				Animate_On = 0;            // Stop scrolling message
+				HAL_Delay(displayHold_delay);           // Delay 1 second
+			}
+
 			break;
 
 		case playerTwoStart:
 			/* Display Player Two Start Screen*/
-			char MessageP2Start[] = // scrolls "Player Two - Place Ships" on Marquee display
-					{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-					CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
-					CHAR_T, CHAR_W, CHAR_O, SPACE, DASH, SPACE,
-					CHAR_P, CHAR_L, CHAR_A, CHAR_C, CHAR_E, SPACE,
-					CHAR_S, CHAR_H, CHAR_I, CHAR_P, CHAR_S,
-					SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
-			Animate_On = 1; // turn on animation so that interrupt displays Message[]
-			Message_Pointer = &MessageP2Start[0];
-			Save_Pointer = &MessageP2Start[0];
-			Message_Length = sizeof(MessageP2Start)/sizeof(MessageP2Start[0]);
-			Delay_msec = 200;
-			HAL_Delay(10000);          // Delay 10 seconds to allow message to scroll
-			Animate_On = 0;            // Stop scrolling message
-			HAL_Delay(1000);           // Delay 1 second
+			if (displayToggle & 1) {
+				displayToggle = 0;
+				char MessageP2Start[] = // scrolls "Player Two - Place Ships" on Marquee display
+						{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+						CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+						CHAR_2, SPACE, DASH, SPACE,
+						CHAR_P, CHAR_L, CHAR_A, CHAR_C, CHAR_E, SPACE,
+						CHAR_S, CHAR_H, CHAR_I, CHAR_P, CHAR_S,
+						SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+				Animate_On = 1; // turn on animation so that interrupt displays Message[]
+				Message_Pointer = &MessageP2Start[0];
+				Save_Pointer = &MessageP2Start[0];
+				Message_Length = sizeof(MessageP2Start)/sizeof(MessageP2Start[0]);
+				Delay_msec = 200;
+				HAL_Delay(playerStart_delay);          // Delay 10 seconds to allow message to scroll
+				Animate_On = 0;            // Stop scrolling message
+				HAL_Delay(displayHold_delay);           // Delay 1 second
+			}
+
 			break;
 
 		case playerOneTurn:
+			/**
+			 * Display player one's turn
+			 */
+			if (displayToggle & 1) {
+				displayToggle = 0;
+				if((playerOne.hits + playerOne.misses) <= 0xF) {
+					char MessageP1Turn[] = // scrolls "Round _" on Marquee display
+							{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+							CHAR_R, CHAR_O, CHAR_U, CHAR_N, CHAR_D, SPACE, UNDER, // TODO replace under with value of round (<0xF)******************************************
+							SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+					Animate_On = 1; // turn on animation so that interrupt displays Message[]
+					Message_Pointer = &MessageP1Turn[0];
+					Save_Pointer = &MessageP1Turn[0];
+					Message_Length = sizeof(MessageP1Turn)/sizeof(MessageP1Turn[0]);
+					Delay_msec = 100;
+					HAL_Delay(round_delay);           // Delay 10 seconds to allow message to scroll
+					Animate_On = 0;            // Stop scrolling message
+					HAL_Delay(displayHold_delay);           // Delay 1 second
+				} else {
+					char MessageP1Turn[] = // scrolls "Round __ - Player One" on Marquee display
+							{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+							CHAR_R, CHAR_O, CHAR_U, CHAR_N, CHAR_D, SPACE, UNDER, // TODO replace under with value of round (>0xF)
+							CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+							CHAR_1, SPACE, DASH, SPACE,
+							CHAR_F, CHAR_I, CHAR_R, CHAR_E, SPACE,
+							CHAR_S, CHAR_H, CHAR_O, CHAR_T,
+							SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+					Animate_On = 1; // turn on animation so that interrupt displays Message[]
+					Message_Pointer = &MessageP1Turn[0];
+					Save_Pointer = &MessageP1Turn[0];
+					Message_Length = sizeof(MessageP1Turn)/sizeof(MessageP1Turn[0]);
+					Delay_msec = 100;
+					HAL_Delay(extRound_delay);          // Delay 10 seconds to allow message to scroll
+					Animate_On = 0;            // Stop scrolling message
+					HAL_Delay(displayHold_delay);           // Delay 1 second
+				}
+			}
+
 			break;
 
 		case playerTwoTurn:
+			/**
+			 * Display player two's turn
+			 */
+			if (displayToggle & 1) {
+				displayToggle = 0;
+				if((playerTwo.hits + playerTwo.misses) <= 0xF) {
+					char MessageP2Turn[] = // scrolls "Round _" on Marquee display
+							{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+							CHAR_R, CHAR_O, CHAR_U, CHAR_N, CHAR_D, SPACE, UNDER, // TODO replace under with value of round (<0xF)******************************************
+							CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+							CHAR_2, SPACE, DASH, SPACE,
+							CHAR_F, CHAR_I, CHAR_R, CHAR_E, SPACE,
+							CHAR_S, CHAR_H, CHAR_O, CHAR_T,
+							SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+					Animate_On = 1; // turn on animation so that interrupt displays Message[]
+					Message_Pointer = &MessageP2Turn[0];
+					Save_Pointer = &MessageP2Turn[0];
+					Message_Length = sizeof(MessageP2Turn)/sizeof(MessageP2Turn[0]);
+					Delay_msec = 100;
+					HAL_Delay(round_delay);           // Delay 10 seconds to allow message to scroll
+					Animate_On = 0;            // Stop scrolling message
+					HAL_Delay(displayHold_delay);           // Delay 1 second
+				} else {
+					char MessageP2Turn[] = // scrolls "Round __ - Player One" on Marquee display
+						{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+						CHAR_R, CHAR_O, CHAR_U, CHAR_N, CHAR_D, SPACE, UNDER, // TODO replace under with value of round (>0xF)
+						CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+						CHAR_2, SPACE, DASH, SPACE,
+						CHAR_F, CHAR_I, CHAR_R, CHAR_E, SPACE,
+						CHAR_S, CHAR_H, CHAR_O, CHAR_T,
+						SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+					Animate_On = 1; // turn on animation so that interrupt displays Message[]
+					Message_Pointer = &MessageP2Turn[0];
+					Save_Pointer = &MessageP2Turn[0];
+					Message_Length = sizeof(MessageP2Turn)/sizeof(MessageP2Turn[0]);
+					Delay_msec = 100;
+					HAL_Delay(extRound_delay);          // Delay 10 seconds to allow message to scroll
+					Animate_On = 0;            // Stop scrolling message
+					HAL_Delay(displayHold_delay);           // Delay 1 second
+				}
+			}
+
 			break;
 
 		/**
@@ -297,11 +414,11 @@ int output (void) {
 		 */
 		case endGame:
 			/* Display Game End Screen*/
-			if (playerOne->hits == 7) { // player one won
+			if (playerOne.hits == 7) { // player one won
 				char MessageP1Wins[] = // scrolls "Player Two - Place Ships" on Marquee display
 						{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 						CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
-						CHAR_O, CHAR_N, CHAR_E, SPACE,
+						CHAR_1, SPACE,
 						CHAR_W, CHAR_I, CHAR_N, CHAR_S,
 						SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 				Animate_On = 1; // turn on animation so that interrupt displays Message[]
@@ -309,14 +426,14 @@ int output (void) {
 				Save_Pointer = &MessageP1Wins[0];
 				Message_Length = sizeof(MessageP1Wins)/sizeof(MessageP1Wins[0]);
 				Delay_msec = 200;
-				HAL_Delay(10000);          // Delay 10 seconds to allow message to scroll
+				HAL_Delay(winner_delay);          // Delay 10 seconds to allow message to scroll
 				Animate_On = 0;            // Stop scrolling message
-				HAL_Delay(1000);           // Delay 1 second
+				HAL_Delay(displayHold_delay);           // Delay 1 second
 			} else { // player two won
 				char MessageP2Wins[] = // scrolls "Player Two - Place Ships" on Marquee display
 						{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 						CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
-						CHAR_T, CHAR_W, CHAR_O, SPACE,
+						CHAR_2, SPACE,
 						CHAR_W, CHAR_I, CHAR_N, CHAR_S,
 						SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 				Animate_On = 1; // turn on animation so that interrupt displays Message[]
@@ -324,10 +441,11 @@ int output (void) {
 				Save_Pointer = &MessageP2Wins[0];
 				Message_Length = sizeof(MessageP2Wins)/sizeof(MessageP2Wins[0]);
 				Delay_msec = 200;
-				HAL_Delay(10000);          // Delay 10 seconds to allow message to scroll
+				HAL_Delay(winner_delay);          // Delay 10 seconds to allow message to scroll
 				Animate_On = 0;            // Stop scrolling message
-				HAL_Delay(1000);           // Delay 1 second
+				HAL_Delay(displayHold_delay);           // Delay 1 second
 			}
+
 			break;
 	}
 
@@ -467,20 +585,20 @@ bitMap compileBoard(bitMap *cursor, bitMap *map) { // TODO try rewriting to just
 	/* compile horizontal */
 	for (int row = 0; row < 3; row++) {
 		for (int col = 0; col < 8; col++) {
-			if (cursor->horizontal_bitMap[row][col] & 1) {
-				comp.horizontal_bitMap[row][col] = cursor->horizontal_bitMap[row][col];
+			if (cursor->horizontal_bitMap[row][col] == blink) { // if the cursor is on the position
+				comp.horizontal_bitMap[row][col] = currCursor;
 			} else {
-				comp.horizontal_bitMap[row][col] = map->horizontal_bitMap[row][col];
+				comp.horizontal_bitMap[row][col] = map->horizontal_bitMap[row][col]; // set comp board position to that of map
 			}
 		}
 	}
 	/* compile vertical */
 	for (int row = 0; row < 2; row++) {
 		for (int col = 0; col < 16; col++) {
-			if (cursor->vertical_bitMap[row][col] & 1) {
-				comp.vertical_bitMap[row][col] = cursor->vertical_bitMap[row][col];
+			if (cursor->vertical_bitMap[row][col] == blink) { // if the cursor is on the position
+				comp.vertical_bitMap[row][col] = currCursor;
 			} else {
-				comp.vertical_bitMap[row][col] = map->vertical_bitMap[row][col];
+				comp.vertical_bitMap[row][col] = map->vertical_bitMap[row][col]; // set comp board position to that of map
 			}
 		}
 	}
@@ -490,6 +608,8 @@ bitMap compileBoard(bitMap *cursor, bitMap *map) { // TODO try rewriting to just
 void drawBoard(bitMap *map) {
 
 	char seg[8] = { 0 };
+	bool dimOn = (timer % 10 == 0); // sets PWM for dimming
+	bool blinkOn = ((timer/225) % 2 == 0); // sets PWM for blinking
 
 	/* set the horizontal segments */
 	for (int i = 0; i < 8; i++)	{
@@ -498,16 +618,14 @@ void drawBoard(bitMap *map) {
 		switch(map->horizontal_bitMap[0][i]) {
 			case off:
 				break;
-			case dim:
-				if (timer % 3 == 0) // TODO revisit to get dim
-					seg[i] |= 1;
+			case targetMiss:
+				seg[i] |= ( dimOn ) ? 1 : 0; // if PWM for dimming is high, set to 1, otherwise 0
 				break;
-			case bright:
+			case targetHit:
 				seg[i] |= 1;
 				break;
 			case blink:
-				if (timer % 6 == 0)
-					seg[i] |= 1;
+				seg[i] |= ( blinkOn ) ? 1 : 0;
 				break;
 		}
 
@@ -515,16 +633,14 @@ void drawBoard(bitMap *map) {
 		switch(map->horizontal_bitMap[1][i]) {
 			case off:
 				break;
-			case dim:
-				if (timer % 3 == 0) // TODO revisit to get dim
-					seg[i] |= 1<<6;
+			case targetMiss:
+				seg[i] |= ( dimOn ) ? 1<<6 : 0;
 				break;
-			case bright:
+			case targetHit:
 				seg[i] |= 1<<6;
 				break;
 			case blink:
-				if (timer % 6 == 0)
-					seg[i] |= 1<<6;
+				seg[i] |= ( blinkOn ) ? 1<<6 : 0;
 				break;
 		}
 
@@ -532,16 +648,14 @@ void drawBoard(bitMap *map) {
 		switch(map->horizontal_bitMap[2][i]) {
 			case off:
 				break;
-			case dim:
-				if (timer % 3 == 0) // TODO revisit to get dim
-					seg[i] |= 1<<3;
+			case targetMiss:
+				seg[i] |= ( dimOn ) ? 1<<3 : 0;
 				break;
-			case bright:
+			case targetHit:
 				seg[i] |= 1<<3;
 				break;
 			case blink:
-				if (timer % 6 == 0)
-					seg[i] |= 1<<3;
+				seg[i] |= ( blinkOn ) ? 1<<3 : 0;
 				break;
 		}
 	}
@@ -560,16 +674,14 @@ void drawBoard(bitMap *map) {
 		switch(map->vertical_bitMap[0][i]) {
 			case off:
 				break;
-			case dim:
-				if (timer % 3 == 0) // TODO revisit to get dim
-					seg[i/2] |= 1<<5;
+			case targetMiss:
+				seg[i/2] |= ( dimOn ) ? 1<<5 : 0;
 				break;
-			case bright:
+			case targetHit:
 				seg[i/2] |= 1<<5;
 				break;
 			case blink:
-				if (timer % 6 == 0)
-					seg[i/2] |= 1<<5;
+				seg[i/2] |= ( blinkOn ) ? 1<<5 : 0;
 				break;
 		}
 
@@ -577,16 +689,14 @@ void drawBoard(bitMap *map) {
 		switch(map->vertical_bitMap[1][i]) {
 			case off:
 				break;
-			case dim:
-				if (timer % 3 == 0) // TODO revisit to get dim
-					seg[i/2] |= 1<<4;
+			case targetMiss:
+				seg[i/2] |= ( dimOn ) ? 1<<4 : 0;
 				break;
-			case bright:
+			case targetHit:
 				seg[i/2] |= 1<<4;
 				break;
 			case blink:
-				if (timer % 6 == 0)
-					seg[i/2] |= 1<<4;
+				seg[i/2] |= ( blinkOn ) ? 1<<4 : 0;
 				break;
 		}
 
@@ -596,16 +706,14 @@ void drawBoard(bitMap *map) {
 		switch(map->vertical_bitMap[0][i]) {
 			case off:
 				break;
-			case dim:
-				if (timer % 3 == 0) // TODO revisit to get dim
-					seg[i/2] |= 1<<1;
+			case targetMiss:
+				seg[i/2] |= ( dimOn ) ? 1<<1 : 0;
 				break;
-			case bright:
+			case targetHit:
 				seg[i/2] |= 1<<1;
 				break;
 			case blink:
-				if (timer % 6 == 0)
-					seg[i/2] |= 1<<1;
+				seg[i/2] |= ( blinkOn ) ? 1<<1 : 0;
 				break;
 		}
 
@@ -613,16 +721,14 @@ void drawBoard(bitMap *map) {
 		switch(map->vertical_bitMap[1][i]) {
 			case off:
 				break;
-			case dim:
-				if (timer % 3 == 0) // TODO revisit to get dim
-					seg[i/2] |= 1<<2;
+			case targetMiss:
+				seg[i/2] |= ( dimOn ) ? 1<<2 : 0;
 				break;
-			case bright:
+			case targetHit:
 				seg[i/2] |= 1<<2;
 				break;
 			case blink:
-				if (timer % 6 == 0)
-					seg[i/2] |= 1<<2;
+				seg[i/2] |= ( blinkOn ) ? 1<<2 : 0;
 				break;
 		}
 	}
@@ -632,7 +738,6 @@ void drawBoard(bitMap *map) {
 	}
 
 	// Set all selects high to latch-in character
-	HAL_Delay(2);
 	GPIOE->ODR |= 0xFF00;
 	return;
 }

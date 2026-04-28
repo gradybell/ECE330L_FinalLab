@@ -185,7 +185,7 @@ void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
 
-	handle_interrupts(); // call back to battleship.c to hand interrupts
+	handle_interrupts(); // call back to battleship.c to handle interrupts
 
 COUNT++;  // Increment note duration counter
 Vibrato_Count++; // Increment the note vibrato effect counter
