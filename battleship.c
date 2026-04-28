@@ -602,7 +602,7 @@ bitMap cursorPosition(int hPot, int vPot, enum cursorOrient orient) {
 				}
 
 			assignIndex_State(row, col, &cursorBoard, horizontalCursor, currCursor);
-		} else { //*****************************************************************************************TODO & for vertical orientation
+		} else { // handle double ship logic ******************************************************TODO & for vertical orientation
 			//horizontal movement
 				if (hPot < 512) { // leftmost position = leftmost segment
 					col = 0;
