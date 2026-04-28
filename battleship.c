@@ -5,6 +5,10 @@
 	//////////////////////////////////
 
 static int timer = 0; // used to control PWM
+static int cursorPosition[2]; // track the location of the cursor
+							  // index 0: row
+							  // index 1: col
+
 /*** Delay Variables to be used in HAL_Delay ***/
 extern int pushButton_delay = 300;
 extern int displayHold_delay = 1000;
@@ -25,9 +29,8 @@ int potHorizontal_in = 0; // potentiometer (PA1) used to control horizontal curs
 int potVertical_in = 0; // potentiometer (PA2) used to control vertical cursor movement
 
 /*** Logic variables ***/
-char playerOneShipsPlaced = 0; // track when player one finishes placing ships
-char playerTwoShipsPlaced = 0; // track when player two finishes placing ships
-char fire = 0; // detect when player has made their move
+bool playerOneShipsPlaced = false; // track when player one finishes placing ships
+bool playerTwoShipsPlaced = false; // track when player two finishes placing ships
 char numRounds = 0; // track number of games played
 char playAgain = 0; // detect if player wants to play again
 bool firstGame = true; // detect if this is the first game played
@@ -118,11 +121,11 @@ typedef enum gameState {title = 0, playerOneStart = 1, playerTwoStart = 2,
 						playerOneTurn = 3, playerTwoTurn = 4, endGame = 5} gameState; // represents all states the game can be in
 						gameState currGameState = title; // start the game at the title sequence
 
-typedef enum cursorOrient {horizontalCursor = 0, verticalCursor = 1} cursorOrient;
-				   	       cursorOrient currCursorOrient = horizontalCursor; // start the cursor in a horizontal orientation
-
 typedef enum LEDstate {off = 0, targetMiss = 1, targetHit = 2, blink = 3} LEDstate;
 					   LEDstate currCursor = blink; // the cursor will always blink
+
+typedef enum cursorOrient {horizontalCursor = 0, verticalCursor = 1} cursorOrient;
+				   	       cursorOrient currCursorOrient = horizontalCursor; // start the cursor in a horizontal orientation
 
 typedef enum shipType {singleShip = 0, doubleShip = 1} shipType;
 					   shipType currShipType = singleShip; // start with a single ship
@@ -160,7 +163,6 @@ typedef struct {
 	char singleBoatsRemaining; // track number of remaining single-spaced boats
 	char doubleBoatsRemaining; // track number of remaining double-spaced boats
 	char hits; // track total number of hits
-	char misses; // track total number of misses	 //TODO delete if unnecessary
 	char numWins;
 } player;
 
@@ -198,7 +200,6 @@ player playerOne = {
 		.singleBoatsRemaining = 3,
 		.doubleBoatsRemaining = 2,
 		.hits = 0,
-		.misses = 0,
 		.numWins = 0
 };
 // Player Two
@@ -208,7 +209,6 @@ player playerTwo = {
 		.singleBoatsRemaining = 3,
 		.doubleBoatsRemaining = 2,
 		.hits = 0,
-		.misses = 0,
 		.numWins = 0
 };
 
@@ -216,13 +216,13 @@ player playerTwo = {
 	////// Function Declarations //////
 	///////////////////////////////////
 
-bitMap cursorPosition(int hPot, int vPot, enum cursorOrient orient);
+bitMap buildCursorBoard(int hPot, int vPot, enum cursorOrient orient);
 bitMap compileBoard(bitMap *cursor, bitMap *map);
 void assignIndex_State(char row, char col, bitMap *map, cursorOrient orient, LEDstate state);
 void drawBoard(bitMap *map);
 
 bitMap placeShips(); // TODO
-LEDstate fireShot(); // TODO
+void fireShot(player *player); // TODO in progress
 
 	//////////////////////////////////
 	////// Function Definitions //////
@@ -287,23 +287,22 @@ int logic (void) {
 	switch (currGameState) {
 
 		case playerOneStart:
-			if (playerOneShipsPlaced == 1) {
-
+			if (playerOneShipsPlaced) {
+				currGameState = playerTwoStart;
 			}
-			currGameState = playerTwoStart;
 			break;
 
 		case playerTwoStart:
-			if (playerTwoShipsPlaced == 1) {
-//TODO logic
+			if (playerTwoShipsPlaced) {
+				currGameState = playerOneTurn;
 			}
-			currGameState = playerOneTurn;
 			break;
 
 		case playerOneTurn:
 			numRounds++; // rounds start with player one's move
-			if (fire & 1) {
-				fire = 0;
+			if (currMoveState == fireState) {
+				currMoveState = idleState;
+				fireShot(&playerOne);
 				if (playerOne.hits == 7) {
 					currGameState = endGame; // game ends
 					break;
@@ -313,8 +312,9 @@ int logic (void) {
 			break;
 
 		case playerTwoTurn:
-			if (fire & 1) {
-				fire = 0;
+			if (currMoveState == fireState) {
+				currMoveState = idleState;
+				fireShot(&playerTwo);
 				if (playerTwo.hits == 7) {
 					currGameState = endGame; // game ends
 					break;
@@ -332,6 +332,7 @@ int logic (void) {
 
 			if (playAgain == 1) {
 //TODO logic
+				firstGame = false;
 			}
 			break;
 	}
@@ -345,7 +346,7 @@ int logic (void) {
 int output (void) {
 
 	/* (TODO delete) TESTING */
-	bitMap cursorBoard = cursorPosition(potHorizontal_in, potVertical_in, currCursorOrient);
+	bitMap cursorBoard = buildCursorBoard(potHorizontal_in, potVertical_in, currCursorOrient);
 	bitMap display = compileBoard(&cursorBoard, &playerOneShips);
 	drawBoard(&display);
 
@@ -584,12 +585,12 @@ int game(void) {
  * moving through conditional checks to allow even ranges for the
  * potentiometers to sweep through for given positions
  */
-bitMap cursorPosition(int hPot, int vPot, enum cursorOrient orient) {
+bitMap buildCursorBoard(int hPot, int vPot, enum cursorOrient orient) {
 	bitMap cursorBoard = {
 			.horizontal_bitMap = { 0 },
 			.vertical_bitMap = { 0 }
 	};
-	char col, row;
+	char row, col;
 
 	/* determine column & row */
 	if (orient == horizontalCursor) { // horizontal segments
@@ -927,3 +928,9 @@ void drawBoard(bitMap *map) {
 	GPIOE->ODR |= 0xFF00;
 	return;
 }
+
+void fireShot(player *player) {
+
+	return;
+}
+
