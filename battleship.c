@@ -20,7 +20,7 @@ extern int endGame_delay = 10000;
 /*** Input variables ***/
 int actionButton_in = 0; // push button 10 (PC10) used to execute action (place boat & fire)
 int toggleButton_in = 0; // push button 11 (PC11) used to toggle cursor between horizontal (0) and vertical (1)
-int shipTypeToggle_in = 0; // switch 8 (PC0) used to switch from 1 space (0) to 2 space (1) ships when placing
+int shipTypeSwitch_in = 0; // switch 8 (PC0) used to switch from 1 space (0) to 2 space (1) ships when placing
 int potHorizontal_in = 0; // potentiometer (PA1) used to control horizontal cursor movement
 int potVertical_in = 0; // potentiometer (PA2) used to control vertical cursor movement
 
@@ -37,6 +37,82 @@ char displayToggle = 1; // toggle on (1) and off (0) to display message
 char displayRound_0th = 0x0; // the 0th position of the number of rounds played
 char displayRound_1st = 0x0; // the 1st position of the number of rounds played
 
+	/* Marquee Messages */
+char MessageTitle[] = // scrolls "Battleship" on Marquee display
+	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+	 CHAR_B, CHAR_A, CHAR_T, CHAR_T, CHAR_L, CHAR_E,
+	 CHAR_S, CHAR_H, CHAR_I, CHAR_P,
+	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+
+char MessageP1Recap[] = // scrolls "Player 1 - _ Wins" on Marquee display
+	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+	 CHAR_1, SPACE, DASH, SPACE,
+	 UNDER, SPACE, CHAR_W, CHAR_I, CHAR_N, CHAR_S, // UNDER (index 21) is replaced with number of P1 wins
+	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+char MessageP2Recap[] = // scrolls "Player 2 - _ Wins" on Marquee display
+	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+	 CHAR_2, SPACE, DASH, SPACE,
+	 UNDER, SPACE, CHAR_W, CHAR_I, CHAR_N, CHAR_S, // UNDER (index 21) is replaced with number of P2 wins
+	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+
+char MessageP1Start[] = // scrolls "Player 1 - Place Ships" on Marquee display
+	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+	 CHAR_1, SPACE, DASH, SPACE,
+	 CHAR_P, CHAR_L, CHAR_A, CHAR_C, CHAR_E, SPACE,
+	 CHAR_S, CHAR_H, CHAR_I, CHAR_P, CHAR_S,
+	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+char MessageP2Start[] = // scrolls "Player 2 - Place Ships" on Marquee display
+	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+	 CHAR_2, SPACE, DASH, SPACE,
+	 CHAR_P, CHAR_L, CHAR_A, CHAR_C, CHAR_E, SPACE,
+	 CHAR_S, CHAR_H, CHAR_I, CHAR_P, CHAR_S,
+	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+
+/**
+ * Each round starts with player 1's move - so the round number is displayed at player 1's turn.
+ * If the number of rounds is greater than 0xF, an additional digit is included
+ */
+char MessageP1Turn[] = // scrolls "Round _ - Player 1" on Marquee display if numRounds <= 0xF
+	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+	 CHAR_R, CHAR_O, CHAR_U, CHAR_N, CHAR_D, SPACE, UNDER, SPACE, DASH, SPACE, // UNDER (index 16) is replaced with round number
+	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE, CHAR_1,
+	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+char MessageP1TurnEXT[] = // scrolls "Round __ - Player 1" on Marquee display if numRounds > 0xF
+	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+	 CHAR_R, CHAR_O, CHAR_U, CHAR_N, CHAR_D, SPACE, UNDER, UNDER, SPACE, DASH, SPACE, // UNDER (index 16 & 17) is replaced with round numbers
+	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE, CHAR_1,
+	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+char MessageP2Turn[] = // scrolls "Round _ - Player 2" on Marquee display if numRounds <= 0xF
+	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE, CHAR_2,
+	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+
+char MessageHit[] = // scrolls "HIT" on Marquee display
+	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+	 CHAR_H, CHAR_I, CHAR_T,
+	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+char MessageMiss[] = // scrolls "MISS" on Marquee display
+	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+	 CHAR_M, CHAR_I, CHAR_S, CHAR_S,
+	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+
+char MessageP1Wins[] = // scrolls "Player 1 Wins" on Marquee display
+	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+	 CHAR_1, SPACE,
+	 CHAR_W, CHAR_I, CHAR_N, CHAR_S,
+	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+char MessageP2Wins[] = // scrolls "Player 2 Wins" on Marquee display
+	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
+	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
+	 CHAR_2, SPACE,
+	 CHAR_W, CHAR_I, CHAR_N, CHAR_S,
+	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+
 /*** Enumerated variables ***/
 typedef enum gameState {title = 0, playerOneStart = 1, playerTwoStart = 2,
 						playerOneTurn = 3, playerTwoTurn = 4, endGame = 5} gameState; // represents all states the game can be in
@@ -52,7 +128,7 @@ typedef enum shipType {singleShip = 0, doubleShip = 1} shipType;
 					   shipType currShipType = singleShip; // start with a single ship
 
 typedef enum moveState {idleState = 0, fireState = 1} moveState;
-					 	moveState currMoveState = idle; // store the state of the current move
+					 	moveState currMoveState = idleState; // store the state of the current move
 
 typedef enum moveResult {missResult = 0, hitResult = 1} moveResult;
 						 moveResult currMoveResult; // store the result of the most recent move
@@ -158,7 +234,7 @@ LEDstate fireShot(); // TODO
 int input(void) {
 	actionButton_in = (GPIOC->IDR >> 10) & 1; // parse only the switch connected to PC10
 	toggleButton_in = (GPIOC->IDR >> 11) & 1; // parse only the switch connected to PC11
-	shipTypeToggle_in = GPIOC->IDR & 1; // parse only PC0
+	shipTypeSwitch_in = GPIOC->IDR & 1; // parse only PC0
 
 	/* lock in action trigger */
 	if (actionButton_in == 0) {
@@ -181,10 +257,10 @@ int input(void) {
 	}
 
 	/* toggle type of ship */
-	if (shipTypeToggle_in & 1) { // slider switch at PC0 is high
-		currShipType == doubleShip;
+	if (shipTypeSwitch_in == 1) { // slider switch at PC0 is high
+		currShipType = doubleShip;
 	} else {
-		currShipType == singleShip;
+		currShipType = singleShip;
 	}
 
 	/* read potentiometers */
@@ -280,11 +356,6 @@ int output (void) {
 			/* Display Game Title */
 			if (displayToggle & 1) {
 				displayToggle = 0;
-				char MessageTitle[] = // scrolls "Battleship" on Marquee display
-					{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-					 CHAR_B, CHAR_A, CHAR_T, CHAR_T, CHAR_L, CHAR_E,
-					 CHAR_S, CHAR_H, CHAR_I, CHAR_P,
-					 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 				Animate_On = 1; // turn on animation so that interrupt displays Message[]
 				Message_Pointer = &MessageTitle[0];
 				Save_Pointer = &MessageTitle[0];
@@ -295,12 +366,7 @@ int output (void) {
 				HAL_Delay(displayHold_delay);           // Delay to give space
 			}
 			if (!firstGame) {
-				char MessageP1Recap[] = // scrolls "Player 1 - _ Wins" on Marquee display
-					{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-					 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
-					 CHAR_1, SPACE, DASH, SPACE,
-					 playerOne.numWins, SPACE, CHAR_W, CHAR_I, CHAR_N, CHAR_S,
-					 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+				MessageP1Recap[21] = playerOne.numWins;
 				Animate_On = 1; // turn on animation so that interrupt displays Message[]
 				Message_Pointer = &MessageP1Recap[0];
 				Save_Pointer = &MessageP1Recap[0];
@@ -310,12 +376,7 @@ int output (void) {
 				Animate_On = 0;            // Stop scrolling message
 				HAL_Delay(displayHold_delay);           // Delay to give space
 
-				char MessageP2Recap[] = // scrolls "Player 2 - _ Wins" on Marquee display
-					{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-					 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
-					 CHAR_2, SPACE, DASH, SPACE,
-					 playerTwo.numWins, SPACE, CHAR_W, CHAR_I, CHAR_N, CHAR_S,
-					 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+				MessageP2Recap[21] = playerTwo.numWins;
 				Animate_On = 1; // turn on animation so that interrupt displays Message[]
 				Message_Pointer = &MessageP2Recap[0];
 				Save_Pointer = &MessageP2Recap[0];
@@ -333,13 +394,6 @@ int output (void) {
 			/* Display Player One Start Screen*/
 			if (displayToggle & 1) {
 				displayToggle = 0;
-				char MessageP1Start[] = // scrolls "Player 1 - Place Ships" on Marquee display
-					{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-					 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
-					 CHAR_1, SPACE, DASH, SPACE,
-					 CHAR_P, CHAR_L, CHAR_A, CHAR_C, CHAR_E, SPACE,
-					 CHAR_S, CHAR_H, CHAR_I, CHAR_P, CHAR_S,
-					 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 				Animate_On = 1; // turn on animation so that interrupt displays Message[]
 				Message_Pointer = &MessageP1Start[0];
 				Save_Pointer = &MessageP1Start[0];
@@ -356,13 +410,6 @@ int output (void) {
 			/* Display Player Two Start Screen*/
 			if (displayToggle & 1) {
 				displayToggle = 0;
-				char MessageP2Start[] = // scrolls "Player 2 - Place Ships" on Marquee display
-					{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-					 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
-					 CHAR_2, SPACE, DASH, SPACE,
-					 CHAR_P, CHAR_L, CHAR_A, CHAR_C, CHAR_E, SPACE,
-					 CHAR_S, CHAR_H, CHAR_I, CHAR_P, CHAR_S,
-					 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 				Animate_On = 1; // turn on animation so that interrupt displays Message[]
 				Message_Pointer = &MessageP2Start[0];
 				Save_Pointer = &MessageP2Start[0];
@@ -387,11 +434,7 @@ int output (void) {
 				 * exceeds 15 (0xF), another digit must be included in the message.
 				 */
 				if(numRounds <= 0xF) {
-					char MessageP1Turn[] = // scrolls "Round _ - Player 1" on Marquee display
-						{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-						 CHAR_R, CHAR_O, CHAR_U, CHAR_N, CHAR_D, SPACE, displayRound_0th, SPACE, DASH, SPACE,
-						 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE, CHAR_1,
-						 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+					MessageP1Turn[16] = displayRound_0th; // update round number (0th position)
 					Animate_On = 1; // turn on animation so that interrupt displays Message[]
 					Message_Pointer = &MessageP1Turn[0];
 					Save_Pointer = &MessageP1Turn[0];
@@ -401,46 +444,36 @@ int output (void) {
 					Animate_On = 0;            // Stop scrolling message
 					HAL_Delay(displayHold_delay);           // Delay to give space
 				} else {
+					MessageP1Turn[17] = displayRound_0th; // update round number (0th position)
+					MessageP1Turn[16] = displayRound_1st; // update round number (1st position)
 					displayRound_1st = numRounds>>0xF; // include bit 1 of numRounds if numRounds > 15
-					char MessageP1Turn[] = // scrolls "Round __ - Player 1" on Marquee display
-						{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-						 CHAR_R, CHAR_O, CHAR_U, CHAR_N, CHAR_D, SPACE, displayRound_1st, displayRound_0th, SPACE, DASH, SPACE,
-						 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE, CHAR_1,
-						 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 					Animate_On = 1; // turn on animation so that interrupt displays Message[]
-					Message_Pointer = &MessageP1Turn[0];
-					Save_Pointer = &MessageP1Turn[0];
-					Message_Length = sizeof(MessageP1Turn)/sizeof(MessageP1Turn[0]);
+					Message_Pointer = &MessageP1TurnEXT[0];
+					Save_Pointer = &MessageP1TurnEXT[0];
+					Message_Length = sizeof(MessageP1TurnEXT)/sizeof(MessageP1TurnEXT[0]);
 					Delay_msec = 100;
 					HAL_Delay(extRound_delay);          // Delay to allow message to scroll
 					Animate_On = 0;            // Stop scrolling message
 					HAL_Delay(displayHold_delay);           // Delay to give space
 				}
 
+				currMoveResult = hitResult; // TODO delete
 				switch(currMoveResult) {
-					case hit:
-						char MessageP1Move[] = // scrolls "HIT" on Marquee display
-							{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-							 CHAR_H, CHAR_I, CHAR_T,
-							 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+					case hitResult:
 						Animate_On = 1; // turn on animation so that interrupt displays Message[]
-						Message_Pointer = &MessageP1Move[0];
-						Save_Pointer = &MessageP1Move[0];
-						Message_Length = sizeof(MessageP1Move)/sizeof(MessageP1Move[0]);
+						Message_Pointer = &MessageHit[0];
+						Save_Pointer = &MessageHit[0];
+						Message_Length = sizeof(MessageHit)/sizeof(MessageHit[0]);
 						Delay_msec = 100;
 						HAL_Delay(move_delay);          // Delay to allow message to scroll
 						Animate_On = 0;            // Stop scrolling message
 						HAL_Delay(displayHold_delay);           // Delay to give space
 						break;
-					case miss:
-						char MessageP1Move[] = // scrolls "MISS" on Marquee display
-							{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-							 CHAR_M, CHAR_I, CHAR_S, CHAR_S,
-							 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
+					case missResult:
 						Animate_On = 1; // turn on animation so that interrupt displays Message[]
-						Message_Pointer = &MessageP1Move[0];
-						Save_Pointer = &MessageP1Move[0];
-						Message_Length = sizeof(MessageP1Move)/sizeof(MessageP1Move[0]);
+						Message_Pointer = &MessageMiss[0];
+						Save_Pointer = &MessageMiss[0];
+						Message_Length = sizeof(MessageMiss)/sizeof(MessageMiss[0]);
 						Delay_msec = 100;
 						HAL_Delay(move_delay);          // Delay to allow message to scroll
 						Animate_On = 0;            // Stop scrolling message
@@ -459,15 +492,8 @@ int output (void) {
 				displayToggle = 0;
 				displayRound_0th = numRounds & 0xF; // there will always be a 0th position round value to display
 				/**
-				 * The number of rounds is represented with a hexadecimal value. If the number of rounds played
-				 * exceeds 15 (0xF), another digit must be included in the message.
+				 * Second half of each round (don't need to update round number)
 				 */
-				if(numRounds <= 0xF) {
-					char MessageP2Turn[] = // scrolls "Round _ - Player 2" on Marquee display
-						{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-						 CHAR_R, CHAR_O, CHAR_U, CHAR_N, CHAR_D, SPACE, displayRound_0th, SPACE, DASH, SPACE,
-						 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE, CHAR_2,
-						 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 					Animate_On = 1; // turn on animation so that interrupt displays Message[]
 					Message_Pointer = &MessageP2Turn[0];
 					Save_Pointer = &MessageP2Turn[0];
@@ -476,21 +502,27 @@ int output (void) {
 					HAL_Delay(round_delay);           // Delay to allow message to scroll
 					Animate_On = 0;            // Stop scrolling message
 					HAL_Delay(displayHold_delay);           // Delay to give space
-				} else {
-					displayRound_1st = numRounds>>0xF; // include bit 1 of numRounds if numRounds > 15
-					char MessageP2Turn[] = // scrolls "Round __ - Player 2" on Marquee display
-						{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-						 CHAR_R, CHAR_O, CHAR_U, CHAR_N, CHAR_D, SPACE, displayRound_1st, displayRound_0th, SPACE, DASH, SPACE,
-						 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE, CHAR_2,
-						 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
-					Animate_On = 1; // turn on animation so that interrupt displays Message[]
-					Message_Pointer = &MessageP2Turn[0];
-					Save_Pointer = &MessageP2Turn[0];
-					Message_Length = sizeof(MessageP2Turn)/sizeof(MessageP2Turn[0]);
-					Delay_msec = 100;
-					HAL_Delay(extRound_delay);          // Delay to allow message to scroll
-					Animate_On = 0;            // Stop scrolling message
-					HAL_Delay(displayHold_delay);           // Delay to give space
+
+				switch(currMoveResult) {
+					case hitResult:
+						Animate_On = 1; // turn on animation so that interrupt displays Message[]
+						Message_Pointer = &MessageHit[0];
+						Save_Pointer = &MessageHit[0];
+						Message_Length = sizeof(MessageHit)/sizeof(MessageHit[0]);
+						Delay_msec = 100;
+						HAL_Delay(move_delay);          // Delay to allow message to scroll
+						Animate_On = 0;            // Stop scrolling message
+						HAL_Delay(displayHold_delay);           // Delay to give space
+						break;
+					case missResult:
+						Message_Pointer = &MessageMiss[0];
+						Save_Pointer = &MessageMiss[0];
+						Message_Length = sizeof(MessageMiss)/sizeof(MessageMiss[0]);
+						Delay_msec = 100;
+						HAL_Delay(move_delay);          // Delay to allow message to scroll
+						Animate_On = 0;            // Stop scrolling message
+						HAL_Delay(displayHold_delay);           // Delay to give space
+						break;
 				}
 			}
 
@@ -502,12 +534,6 @@ int output (void) {
 		case endGame:
 			/* Display Game End Screen*/
 			if (playerOne.hits == 7) { // player one won
-				char MessageP1Wins[] = // scrolls "Player Two - Place Ships" on Marquee display
-					{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-					 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
-					 CHAR_1, SPACE,
-					 CHAR_W, CHAR_I, CHAR_N, CHAR_S,
-					 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 				Animate_On = 1; // turn on animation so that interrupt displays Message[]
 				Message_Pointer = &MessageP1Wins[0];
 				Save_Pointer = &MessageP1Wins[0];
@@ -517,12 +543,6 @@ int output (void) {
 				Animate_On = 0;            // Stop scrolling message
 				HAL_Delay(displayHold_delay);           // Delay to give space
 			} else { // player two won
-				char MessageP2Wins[] = // scrolls "Player Two - Place Ships" on Marquee display
-					{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
-					 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
-					 CHAR_2, SPACE,
-					 CHAR_W, CHAR_I, CHAR_N, CHAR_S,
-					 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 				Animate_On = 1; // turn on animation so that interrupt displays Message[]
 				Message_Pointer = &MessageP2Wins[0];
 				Save_Pointer = &MessageP2Wins[0];
@@ -602,26 +622,27 @@ bitMap cursorPosition(int hPot, int vPot, enum cursorOrient orient) {
 				}
 
 			assignIndex_State(row, col, &cursorBoard, horizontalCursor, currCursor);
-		} else { // handle double ship logic ******************************************************TODO & for vertical orientation
+		} else { // handle double ship logic for horizontal orientation ***************TODO
+			/**
+			 * For double ships, the cursor will be set to the position of col & col+1
+			 */
 			//horizontal movement
-				if (hPot < 512) { // leftmost position = leftmost segment
-					col = 0;
-				} else if (hPot < 1024) {
-					col = 1;
-				} else if (hPot < 1536) {
-					col = 2;
-				} else if (hPot < 2048) { // middle position = middle segment
-					col = 3;
-				} else if (hPot < 2560) {
-					col = 4;
-				} else if (hPot < 3072) {
-					col = 5;
-				} else if (hPot < 3584) {
-					col = 6;
+				if (hPot < 585) { // leftmost position = leftmost segment
+					col = 0; // & 1
+				} else if (hPot < 1170) {
+					col = 1; // & 2
+				} else if (hPot < 1755) {
+					col = 2; // & 3
+				} else if (hPot < 2341) { // middle position = middle segment
+					col = 3; // & 4
+				} else if (hPot < 2926) {
+					col = 4; // & 5
+				} else if (hPot < 3511) {
+					col = 5; // & 6
 				} else { // rightmost position = rightmost segment
-					col = 7;
+					col = 6; // & 7
 				}
-			//vertical movement
+			//vertical movement functionality is unchanged
 				if (vPot < 1365) { // left position = top
 					row = 0;
 				} else if (vPot < 2730) { // middle position = middle
@@ -631,52 +652,98 @@ bitMap cursorPosition(int hPot, int vPot, enum cursorOrient orient) {
 				}
 
 			assignIndex_State(row, col, &cursorBoard, horizontalCursor, currCursor);
+			assignIndex_State(row, col+1, &cursorBoard, horizontalCursor, currCursor);
 		}
 
 
 	} else { // vertical segments
-	//horizontal movement
-		if (hPot < 256) { // leftmost position = leftmost segment
-			col = 0;
-		} else if (hPot < 512) {
-			col = 1;
-		} else if (hPot < 768) {
-			col = 2;
-		} else if (hPot < 1024) {
-			col = 3;
-		} else if (hPot < 1280) {
-			col = 4;
-		} else if (hPot < 1536) {
-			col = 5;
-		} else if (hPot < 1792) {
-			col = 6;
-		} else if (hPot < 2048) { // middle position = middle segment
-			col = 7;
-		} else if (hPot < 2304) {
-			col = 8;
-		} else if (hPot < 2560) {
-			col = 9;
-		} else if (hPot < 2816) {
-			col = 10;
-		} else if (hPot < 3072) {
-			col = 11;
-		} else if (hPot < 3328) {
-			col = 12;
-		} else if (hPot < 3584) {
-			col = 13;
-		} else if (hPot < 3840) {
-			col = 14;
-		} else { // rightmost position = rightmost segment
-			col = 15;
-		}
-	//vertical movement
-		if (vPot < 2048) { // left position = top
-			row = 0;
-		} else { // right position = bottom
-			row = 1;
-		}
+		if (currShipType == singleShip) {
+		//horizontal movement
+			if (hPot < 256) { // leftmost position = leftmost segment
+				col = 0;
+			} else if (hPot < 512) {
+				col = 1;
+			} else if (hPot < 768) {
+				col = 2;
+			} else if (hPot < 1024) {
+				col = 3;
+			} else if (hPot < 1280) {
+				col = 4;
+			} else if (hPot < 1536) {
+				col = 5;
+			} else if (hPot < 1792) {
+				col = 6;
+			} else if (hPot < 2048) { // middle position = middle segment
+				col = 7;
+			} else if (hPot < 2304) {
+				col = 8;
+			} else if (hPot < 2560) {
+				col = 9;
+			} else if (hPot < 2816) {
+				col = 10;
+			} else if (hPot < 3072) {
+				col = 11;
+			} else if (hPot < 3328) {
+				col = 12;
+			} else if (hPot < 3584) {
+				col = 13;
+			} else if (hPot < 3840) {
+				col = 14;
+			} else { // rightmost position = rightmost segment
+				col = 15;
+			}
+		//vertical movement
+			if (vPot < 2048) { // left position = top
+				row = 0;
+			} else { // right position = bottom
+				row = 1;
+			}
 
-		assignIndex_State(row, col, &cursorBoard, verticalCursor, currCursor);
+			assignIndex_State(row, col, &cursorBoard, verticalCursor, currCursor);
+		} else { // handle double ship logic for vertical orientation ***************TODO
+			/**
+			 * For double ships, the cursor will be set to the position of row & row+1
+			 */
+		//horizontal movement functionality is unchanged
+			if (hPot < 256) { // leftmost position = leftmost segment
+				col = 0;
+			} else if (hPot < 512) {
+				col = 1;
+			} else if (hPot < 768) {
+				col = 2;
+			} else if (hPot < 1024) {
+				col = 3;
+			} else if (hPot < 1280) {
+				col = 4;
+			} else if (hPot < 1536) {
+				col = 5;
+			} else if (hPot < 1792) {
+				col = 6;
+			} else if (hPot < 2048) { // middle position = middle segment
+				col = 7;
+			} else if (hPot < 2304) {
+				col = 8;
+			} else if (hPot < 2560) {
+				col = 9;
+			} else if (hPot < 2816) {
+				col = 10;
+			} else if (hPot < 3072) {
+				col = 11;
+			} else if (hPot < 3328) {
+				col = 12;
+			} else if (hPot < 3584) {
+				col = 13;
+			} else if (hPot < 3840) {
+				col = 14;
+			} else { // rightmost position = rightmost segment
+				col = 15;
+			}
+		//vertical movement
+			row = 0; // & 1 - the double ship must take up both vertical segments
+
+			assignIndex_State(row, col, &cursorBoard, verticalCursor, currCursor);
+			assignIndex_State(row+1, col, &cursorBoard, verticalCursor, currCursor);
+		}
 	}
 
 	return cursorBoard;
@@ -727,8 +794,8 @@ bitMap compileBoard(bitMap *cursor, bitMap *map) { // TODO try rewriting to just
 void drawBoard(bitMap *map) {
 
 	char seg[8] = { 0 };
-	bool dimOn = (timer % 10 == 0); // sets PWM for dimming
-	bool blinkOn = ((timer/225) % 2 == 0); // sets PWM for blinking
+	bool dimOn = (timer % 8 == 0); // sets PWM for dimming
+	bool blinkOn = ((timer/250) % 2 == 0); // sets PWM for blinking
 
 	/* set the horizontal segments */
 	for (int i = 0; i < 8; i++)	{
