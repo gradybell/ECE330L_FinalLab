@@ -13,12 +13,13 @@
 #define DISPLAYHOLD_DELAY 1000
 #define TITLESCROLL_DELAY 3300
 #define RECAPSCROLL_DELAY 8000
-#define PLAYERSTARTSCROLL_DELAY 10000
+#define PLAYERSTARTSCROLL_DELAY 5000
 #define ROUNDSCROLL_DELAY 2000
 #define EXTROUNDSCROLL_DELAY 2100
 #define MOVESCROLL_DELAY 1800
 #define WINNERSCROLL_DELAY 5000
 #define ENDGAMESCROLL_DELAY 10000
+//TODO add delay for "Play Again"
 
 /*** Enumerated variables ***/
 typedef enum {
@@ -28,12 +29,11 @@ typedef enum {
     playerTwoStart = 3,
     playerOneTurn = 4,
     playerTwoTurn = 5,
-    endGame = 6,
-    test = 7
+    endGame = 6
 } gameState; /* All states the game can be in */
 
 
-typedef enum {
+typedef enum { // TODO could be cool to have "sunk" state
 	off = 0,
 	targetMiss = 1, // Dim
 	targetHit = 2, // Bright
