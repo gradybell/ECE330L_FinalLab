@@ -48,7 +48,7 @@ typedef enum {
 typedef enum {
 	horizontalCursor = 0,
 	verticalCursor = 1
-} cursorOrient; /* Orientation of the cursor */
+} orient; /* Orientation of the cursor */
 
 typedef enum {
 	singleShip = 0,
