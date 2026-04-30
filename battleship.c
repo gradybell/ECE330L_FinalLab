@@ -9,7 +9,7 @@
 	//////////////////////////////////
 
 static int timer = 0; // Used to control PWM
-static int currCursorPosition[2]; // Track the specific location of the cursor
+static int cursorPosition[2]; // Track the specific location of the cursor
 								  // Index 0: row
 							  	  // Index 1: col
 
@@ -18,8 +18,8 @@ static int currCursorPosition[2]; // Track the specific location of the cursor
 static int actionButton_in = 0; // Push button 10 (PC10) used to execute action (place boat & fire)
 static int toggleButton_in = 0; // Push button 11 (PC11) used to toggle cursor between horizontal (0) and vertical (1)
 static int shipTypeSwitch_in = 0; // switch 8 (PC0) used to switch from 1 space (0) to 2 space (1) ships when placing
-static int potHorizontal_in = 0; // Potentiometer (PA1) used to control horizontal cursor movement
-static int potVertical_in = 0; // Potentiometer (PA2) used to control vertical cursor movement
+static int hPot = 0; // Potentiometer (PA1) used to control horizontal cursor movement
+static int vPot = 0; // Potentiometer (PA2) used to control vertical cursor movement
 
 // Logic Variables
 static bool playerOneShipsPlaced = false; // Track when player one finishes placing ships
@@ -120,7 +120,7 @@ static char MessageP2Wins[] = // Scrolls "Player 2 Wins" on Marquee display
 /*** Instances of Enumerated Variables ***/
 static gameState currGameState = title; // Start the game at the title sequence
 static LEDstate cursorState = blink; // The cursor will always blink
-static cursorOrient currCursorOrient = horizontalCursor; // Start the cursor in a horizontal orientation
+static orient cursorOrient = horizontalCursor; // Start the cursor in a horizontal orientation
 static shipType currShipType = singleShip; // Start with a single ship
 static moveState currMoveState = idleState; // Store the state of the current move
 static moveResult currMoveResult = noResult; // Start with no moves made
@@ -198,7 +198,7 @@ static bitMap* compBoardPointer = &compBoard;
 // Set message to be displayed
 	static void displayMessage(char *messageNamePointer, int messageLength, int scrollSpeed, int messageDelay, int holdDelay);
 // Determine & set position of cursor on board
-	static void buildCursorBoard(int hPot, int vPot, cursorOrient orient);
+	static void buildCursorBoard(void);
 // Set cursor on game board
 	static void compileBoard(void);
 // Set a specific position on a map to a given LEDstate
@@ -209,6 +209,8 @@ static bitMap* compBoardPointer = &compBoard;
 	static void placeShip(player *playerPointer);
 // Make move
 	static void fireShot(player *playerPointer);
+// Store move result
+	static void storeMoveResult(bitMap *gameBoard);
 // Prepare the game to be played again
 	static void resetGame(void);
 
@@ -260,11 +262,11 @@ void input(void) {
 
 	/* Toggle orientation of cursor */
 	if (toggleButton_in == 0) {
-		if (currCursorOrient == verticalCursor) { // The cursor is horizontal
-			currCursorOrient = horizontalCursor;
+		if (cursorOrient == verticalCursor) { // The cursor is horizontal
+			cursorOrient = horizontalCursor;
 			HAL_Delay(PUSHBUTTON_DELAY);
 		} else {
-			currCursorOrient = verticalCursor;
+			cursorOrient = verticalCursor;
 			HAL_Delay(PUSHBUTTON_DELAY);
 		}
 	}
@@ -281,13 +283,13 @@ void input(void) {
 		ADC1->SQR3 = 1; // Select channel 1
 		ADC1->CR2 |= 1<<30; // Start sequence of reading & converting channel 1
 		while(!(ADC1->SR & 1<<1));
-		potHorizontal_in = ADC1->DR; // Read value from potentiometer at PA1
+		hPot = ADC1->DR; // Read value from potentiometer at PA1
 
 		// Vertical
 		ADC1->SQR3 = 2; // Select channel 2
 		ADC1->CR2 |= 1<<30; // Start sequence of reading & converting channel 2
 		while(!(ADC1->SR & 1<<1));
-		potVertical_in = ADC1->DR; // Read value from potentiometer at PA2
+		vPot = ADC1->DR; // Read value from potentiometer at PA2
 
 	return;
 }
@@ -298,8 +300,8 @@ void input(void) {
 void logic (void) {
 
 	/* Prepare Game Board */
-	buildCursorBoard(potHorizontal_in, potVertical_in, currCursorOrient); // updates cursorBoard (cursorBoardPointer already points to cursorBoard)
-	compileBoard(cursorBoardPointer, displayBoardPointer);
+	buildCursorBoard(); // updates cursorBoard (cursorBoardPointer already points to cursorBoard)
+	compileBoard();
 
 	switch (currGameState) {
 
@@ -309,7 +311,7 @@ void logic (void) {
 	 * Move to "playerOneStart"
 	 */
 		case title:
-			currDisplayState = scroll; // this state only displays a message
+			currDisplayState = scroll; // This state only displays a message
 			outputMessage(); // Read the game start sequence
 			currGameState = playerOneStart; // Move to next state
 			// Do not break, pass directly into playerOneStart while currDisplayState is scroll
@@ -320,27 +322,27 @@ void logic (void) {
 	 * Move to "playerTwoStart"
 	 */
 		case playerOneStart:
-			// enter on first pass from case "title"
+			// Enter on first pass from case "title"
 			if (currDisplayState == scroll) {
 				outputMessage(); // Read player one start sequence
 				displayBoardPointer = &playerOne.ownMap;
 				currDisplayState = play; // allow player one to place ships
-
 			}
 
 			if (currMoveState == actionState) {
 				currMoveState = idleState;
 
 				/* Check for superposition */
-				if (currCursorOrient == horizontalCursor) {
-					if ( (playerOne.ownMap->horizontal_shipMap[ currCursorPosition[0] ][ currCursorPosition[1] ]) // space already contains ship
-						|| ( (currShipType == doubleShip) // check if second half of double ship will superpose
-							&& (playerOne.ownMap->horizontal_shipMap[ currCursorPosition[0] ][ currCursorPosition[1] + 1 ]) ) ) {
+				if (cursorOrient == horizontalCursor) {
+					if ( (playerOne.ownMap->horizontal_shipMap[ cursorPosition[0] ][ cursorPosition[1] ]) ) { // space already contains ship
+						break;
+					} else if( (currShipType == doubleShip) // check if second half of double ship will superpose
+							&& (playerOne.ownMap->horizontal_shipMap[ cursorPosition[0] ][ cursorPosition[1] + 1 ]) ) {
 						break; // Law of superposition
 					}
-				} else { // cursor is vertical
-					if (playerOne.ownMap->vertical_shipMap[ currCursorPosition[0] ][ currCursorPosition[1] ]) { // space already contains ship
-						break; // law of superposition
+				} else { // Cursor is vertical
+					if (playerOne.ownMap->vertical_shipMap[ cursorPosition[0] ][ cursorPosition[1] ]) { // space already contains ship
+						break; // Law of superposition
 					}
 				} // Position is not occupied, safe to place
 
@@ -375,14 +377,14 @@ void logic (void) {
 				currMoveState = idleState;
 
 				/* Check for superposition */
-				if (currCursorOrient == horizontalCursor) {
-					if ( (playerTwo.ownMap->horizontal_shipMap[ currCursorPosition[0] ][ currCursorPosition[1] ]) // space already contains ship
+				if (cursorOrient == horizontalCursor) {
+					if ( (playerTwo.ownMap->horizontal_shipMap[ cursorPosition[0] ][ cursorPosition[1] ]) // space already contains ship
 						|| ( (currShipType == doubleShip) // check if second half of double ship will superpose
-							&& (playerTwo.ownMap->horizontal_shipMap[ currCursorPosition[0] ][ currCursorPosition[1] + 1 ]) ) ) {
+							&& (playerTwo.ownMap->horizontal_shipMap[ cursorPosition[0] ][ cursorPosition[1] + 1 ]) ) ) {
 						break; // law of superposition
 					}
 				} else { // cursor is vertical
-					if (playerTwo.ownMap->vertical_shipMap[ currCursorPosition[0] ][ currCursorPosition[1] ]) { // space already contains ship
+					if (playerTwo.ownMap->vertical_shipMap[ cursorPosition[0] ][ cursorPosition[1] ]) { // space already contains ship
 						break; // law of superposition
 					}
 				} // position is not occupied
@@ -432,14 +434,14 @@ void logic (void) {
 				currMoveState = idleState;
 
 				/* Check if position has been played */
-				if (currCursorOrient == horizontalCursor) {
-					if (playerOne.opponentMap->horizontal_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] == targetHit
-					 || playerOne.opponentMap->horizontal_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] == targetMiss) {
+				if (cursorOrient == horizontalCursor) {
+					if (playerOne.opponentMap->horizontal_LEDMap[ cursorPosition[0] ][ cursorPosition[1] ] == targetHit
+					 || playerOne.opponentMap->horizontal_LEDMap[ cursorPosition[0] ][ cursorPosition[1] ] == targetMiss) {
 						break; // the position cannot be played twice
 					}
 				} else {
-					if (playerOne.opponentMap->vertical_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] == targetHit
-					 || playerOne.opponentMap->vertical_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] == targetMiss) {
+					if (playerOne.opponentMap->vertical_LEDMap[ cursorPosition[0] ][ cursorPosition[1] ] == targetHit
+					 || playerOne.opponentMap->vertical_LEDMap[ cursorPosition[0] ][ cursorPosition[1] ] == targetMiss) {
 						break; // the position cannot be played twice
 					}
 				} // position is unplayed
@@ -476,12 +478,12 @@ void logic (void) {
 				currMoveState = idleState;
 
 				/* Check if position has been played */
-				if (currCursorOrient == horizontalCursor) {
-					if ( !(playerTwo.opponentMap->horizontal_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] == off) ) {
+				if (cursorOrient == horizontalCursor) {
+					if ( !(playerTwo.opponentMap->horizontal_LEDMap[ cursorPosition[0] ][ cursorPosition[1] ] == off) ) {
 						break; // the position cannot be played twice
 					}
 				} else {
-					if ( !(playerTwo.opponentMap->vertical_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] == off) ) {
+					if ( !(playerTwo.opponentMap->vertical_LEDMap[ cursorPosition[0] ][ cursorPosition[1] ] == off) ) {
 						break; // the position cannot be played twice
 					}
 				}
@@ -556,6 +558,13 @@ void outputMessage (void) {
 			/* Display Player One Start Screen*/
 			if (currDisplayState == scroll) {
 				displayMessage(MessageP1Start, sizeof(MessageP1Start), SCROLLSPEED_NORM, PLAYERSTARTSCROLL_DELAY, DISPLAYHOLD_DELAY);
+			}
+			else { // TODO delete
+				if (currMoveState == actionState) {
+					GPIOD->ODR |= 1;
+				} else {
+					GPIOD->ODR &= ~1;
+				}
 			}
 
 			break;
@@ -684,27 +693,20 @@ void displayMessage(char *messageNamePointer, int messageLength, int scrollSpeed
  * moving through conditional checks to allow even ranges for the
  * potentiometers to sweep through for given positions
  */
-void buildCursorBoard(int hPot, int vPot, cursorOrient orient) {
+void buildCursorBoard() {
 	char row, col;
 
 	/* Reset cursorBoard */
-	// Clear horizontal segments of cursorBoard
-	for (row = 0; row < 3; row++) {
-		for (col = 0; col < 8; col++) {
-			cursorBoard.horizontal_LEDMap[row][col] = off;
-		}
+	if (cursorOrient == horizontalCursor) {
+		cursorBoardPointer->horizontal_LEDMap[ cursorPosition[0] ][ cursorPosition[1] ] = off;
+	} else {
+		cursorBoardPointer->vertical_LEDMap[ cursorPosition[0] ][ cursorPosition[1] ] = off;
 	}
-	// Clear vertical segments of cursorBoard
-	for (row = 0; row < 2; row++) {
-		for (col = 0; col < 16; col++) {
-			cursorBoard.vertical_LEDMap[row][col] = off;
-		}
-	} row = col = 0; // Reset row and col
 
-	if (orient == horizontalCursor) { // Determine horizontal-segment column & row to set cursorBoard with horizontal cursor
+	if (cursorOrient == horizontalCursor) { // Determine horizontal-segment column & row to set cursorBoard with horizontal cursor
 
 		if ( (currShipType == singleShip)
-	    || (currGameState != playerOneStart && currGameState != playerTwoStart) ) {
+	      || (currGameState != playerOneStart && currGameState != playerTwoStart) ) {
 			// Lateral potentiometer positions
 				if (hPot < 512) { // Leftmost position = leftmost segment
 					col = 0;
@@ -772,10 +774,9 @@ void buildCursorBoard(int hPot, int vPot, cursorOrient orient) {
 	} else { // Determine vertical-segment column & row to set cursorBoard with vertical cursor
 		/**
 		 * This block sets a single cursor blinking
-		 */								   //
-		if ( (currShipType == singleShip) // enables "super-speed mode" where program runs SOOO much faster when switch at PC0 is down
-										 //  because the loop enters one condition check earlier than if it is high
-		|| (currGameState != playerOneStart && currGameState != playerTwoStart) ) {
+		 */
+		if ( (currShipType == singleShip)
+		  || (currGameState != playerOneStart && currGameState != playerTwoStart) ) {
 			// Horizontal segment positions are unchanged
 				if (hPot < 256) { // Leftmost position = leftmost segment
 					col = 0;
@@ -866,8 +867,8 @@ void buildCursorBoard(int hPot, int vPot, cursorOrient orient) {
 			}
 		}
 
-	currCursorPosition[0] = row;
-	currCursorPosition[1] = col;
+	cursorPosition[0] = row;
+	cursorPosition[1] = col;
 	return;
 }
 
@@ -876,10 +877,10 @@ void buildCursorBoard(int hPot, int vPot, cursorOrient orient) {
  */
 void assignCursorPosition(char row, char col) {
 
-	if (currCursorOrient == horizontalCursor) {
-		cursorBoardPointer->horizontal_LEDMap[row][col] = state;
+	if (cursorOrient == horizontalCursor) {
+		cursorBoardPointer->horizontal_LEDMap[row][col] = cursorState;
 	} else {
-		cursorBoardPointer->vertical_LEDMap[row][col] = state;
+		cursorBoardPointer->vertical_LEDMap[row][col] = cursorState;
 	}
 	return;
 }
@@ -895,7 +896,7 @@ void compileBoard() {
 			if (cursorBoardPointer->horizontal_LEDMap[row][col] == blink) { // if the cursor is on the position
 				compBoardPointer->horizontal_LEDMap[row][col] = cursorState;;
 			} else {
-				compBoardPointer->horizontal_LEDMap[row][col] = gameBoardPointer->horizontal_LEDMap[row][col]; // set comp board position to that of board
+				compBoardPointer->horizontal_LEDMap[row][col] = displayBoardPointer->horizontal_LEDMap[row][col]; // set comp board position to that of board
 			}
 		}
 	}
@@ -906,7 +907,7 @@ void compileBoard() {
 			if (cursorBoardPointer->vertical_LEDMap[row][col] == blink) { // if the cursor is on the position
 				compBoardPointer->vertical_LEDMap[row][col] = cursorState;;
 			} else {
-				compBoardPointer->vertical_LEDMap[row][col] = gameBoardPointer->vertical_LEDMap[row][col]; // set comp board position to that of board
+				compBoardPointer->vertical_LEDMap[row][col] = displayBoardPointer->vertical_LEDMap[row][col]; // set comp board position to that of board
 			}
 		}
 	}
@@ -1059,47 +1060,47 @@ void drawBoard(bitMap *board) {
  * and remaining ship count
  */
 void placeShip(player *playerPointer) {
-	if (currCursorOrient == horizontalCursor) { /*** Horizontal ***/
+	if (cursorOrient == horizontalCursor) { /*** Horizontal ***/
 
 		if (currShipType == singleShip) { // place single ship
-			playerPointer->ownMap->horizontal_shipMap[ currCursorPosition[0] ][ currCursorPosition [1] ] = hasShip;
+			playerPointer->ownMap->horizontal_shipMap[ cursorPosition[0] ][ cursorPosition [1] ] = hasShip;
 			playerPointer->singleBoatsRemaining++; // playerPointer has placed one more single boat
 		} else { // place double ship
 			if (playerPointer->doubleBoatsRemaining == 0) { // set first boat properties
 
 				playerPointer->doubleBoatProperties[0][0] = 0; // orientation is horizontal
-				playerPointer->doubleBoatProperties[0][1] = currCursorPosition[0]; // set row to currCursorPosition row
-				playerPointer->doubleBoatProperties[0][2] = currCursorPosition[1]; // set col to currCursorPosition col
+				playerPointer->doubleBoatProperties[0][1] = cursorPosition[0]; // set row to cursorPosition row
+				playerPointer->doubleBoatProperties[0][2] = cursorPosition[1]; // set col to cursorPosition col
 			} else if (playerPointer->doubleBoatsRemaining == 1) { // set second boat properties
 
 				playerPointer->doubleBoatProperties[1][0] = 0; // orientation is horizontal
-				playerPointer->doubleBoatProperties[1][1] = currCursorPosition[0]; // set row to currCursorPosition row
-				playerPointer->doubleBoatProperties[1][2] = currCursorPosition[1]; // set col to currCursorPosition col
+				playerPointer->doubleBoatProperties[1][1] = cursorPosition[0]; // set row to cursorPosition row
+				playerPointer->doubleBoatProperties[1][2] = cursorPosition[1]; // set col to cursorPosition col
 			}
-			playerPointer->ownMap->horizontal_shipMap[ currCursorPosition[0] ][ currCursorPosition [1] ] = hasShip; // first half of double boat
-			playerPointer->ownMap->horizontal_shipMap[ currCursorPosition[0] ][ currCursorPosition [1] + 1 ] = hasShip; // second half of double boat
+			playerPointer->ownMap->horizontal_shipMap[ cursorPosition[0] ][ cursorPosition [1] ] = hasShip; // first half of double boat
+			playerPointer->ownMap->horizontal_shipMap[ cursorPosition[0] ][ cursorPosition [1] + 1 ] = hasShip; // second half of double boat
 			playerPointer->doubleBoatsRemaining++; // player has placed one more double boat
 		}
 
 	} else { /*** Vertical ***/
 
 		if (currShipType == singleShip) { // place single ship
-			playerPointer->ownMap->vertical_shipMap[ currCursorPosition[0] ][ currCursorPosition [1] ] = hasShip;
+			playerPointer->ownMap->vertical_shipMap[ cursorPosition[0] ][ cursorPosition [1] ] = hasShip;
 			playerPointer->singleBoatsRemaining++; // player has placed one more single boat
 		} else { // place double ship
 			if (playerPointer->doubleBoatsRemaining == 0) { // set first boat properties
 
 				playerPointer->doubleBoatProperties[0][0] = 1; // orientation is vertical
-				playerPointer->doubleBoatProperties[0][1] = currCursorPosition[0]; // set row to currCursorPosition row
-				playerPointer->doubleBoatProperties[0][2] = currCursorPosition[1]; // set col to currCursorPosition col
+				playerPointer->doubleBoatProperties[0][1] = cursorPosition[0]; // set row to cursorPosition row
+				playerPointer->doubleBoatProperties[0][2] = cursorPosition[1]; // set col to cursorPosition col
 			} else if (playerPointer->doubleBoatsRemaining == 1) { // set second boat properties
 
 				playerPointer->doubleBoatProperties[1][0] = 1; // orientation is vertical
-				playerPointer->doubleBoatProperties[1][1] = currCursorPosition[0]; // set row to currCursorPosition row
-				playerPointer->doubleBoatProperties[1][2] = currCursorPosition[1]; // set col to currCursorPosition col
+				playerPointer->doubleBoatProperties[1][1] = cursorPosition[0]; // set row to cursorPosition row
+				playerPointer->doubleBoatProperties[1][2] = cursorPosition[1]; // set col to cursorPosition col
 			}
-			playerPointer->ownMap->vertical_shipMap[ currCursorPosition[0] ][ currCursorPosition [1] ] = hasShip; // first half of double boat
-			playerPointer->ownMap->vertical_shipMap[ currCursorPosition[0] + 1 ][ currCursorPosition [1] ] = hasShip; // second half of double boat
+			playerPointer->ownMap->vertical_shipMap[ cursorPosition[0] ][ cursorPosition [1] ] = hasShip; // first half of double boat
+			playerPointer->ownMap->vertical_shipMap[ cursorPosition[0] + 1 ][ cursorPosition [1] ] = hasShip; // second half of double boat
 			playerPointer->doubleBoatsRemaining++; // player has placed one more double boat
 		}
 
@@ -1112,29 +1113,39 @@ void placeShip(player *playerPointer) {
  */
 void fireShot(player *playerPointer) {
 	/* Determine currMoveResult */
-	if (currCursorOrient == horizontalCursor) { // check cursor position against horizontal segments
-		if (playerPointer->opponentMap->horizontal_shipMap[ currCursorPosition[0] ][ currCursorPosition[1] ]) { // position hasShip
-			playerPointer->opponentMap->horizontal_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] = targetHit; // bright
+	if (cursorOrient == horizontalCursor) { // check cursor position against horizontal segments
+		if (playerPointer->opponentMap->horizontal_shipMap[ cursorPosition[0] ][ cursorPosition[1] ]) { // position hasShip
+			playerPointer->opponentMap->horizontal_LEDMap[ cursorPosition[0] ][ cursorPosition[1] ] = targetHit; // bright
 			currMoveResult = hitResult;
 			playerPointer->numHits++;
 
 		} else { // position isEmpty
-			playerPointer->ownMap->horizontal_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] = targetMiss; // dim
+			playerPointer->ownMap->horizontal_LEDMap[ cursorPosition[0] ][ cursorPosition[1] ] = targetMiss; // dim
 			currMoveResult = missResult;
 		}
 	} else { // check cursor position against vertical segments
-		if (playerPointer->opponentMap->vertical_shipMap[ currCursorPosition[0] ][ currCursorPosition[1] ]) { // position hasShip
-			playerPointer->opponentMap->vertical_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] = targetHit; // bright
+		if (playerPointer->opponentMap->vertical_shipMap[ cursorPosition[0] ][ cursorPosition[1] ]) { // position hasShip
+			playerPointer->opponentMap->vertical_LEDMap[ cursorPosition[0] ][ cursorPosition[1] ] = targetHit; // bright
 			currMoveResult = hitResult;
 			playerPointer->numHits++;
 		} else { // position isEmpty
-			playerPointer->opponentMap->vertical_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] = targetMiss; // dim
+			playerPointer->opponentMap->vertical_LEDMap[ cursorPosition[0] ][ cursorPosition[1] ] = targetMiss; // dim
 			currMoveResult = missResult;
 		}
 	}
 
 	/* Update game board */
-	assignCursorPosition(&playerPointer->opponentMap, currCursorPosition[0], currCursorPosition[1], currCursorOrient, currMoveResult);
+	storeMoveResult(&playerPointer->opponentMap);
+
+	return;
+}
+
+void storeMoveResult(bitMap *gameBoard) {
+	if (cursorOrient == horizontalCursor) {
+		gameBoard->horizontal_LEDMap[ cursorPosition[0] ][ cursorPosition[1] ] = currMoveResult;
+	} else {
+
+	}
 
 	return;
 }
