@@ -1,7 +1,7 @@
 #include "battleship.h"
 
 /*******************************/
-/****** WORKING NOTES   ******/
+/******   WORKING NOTES   ******/
 /*******************************/
 
 	//////////////////////////////////
@@ -10,8 +10,8 @@
 
 static int timer = 0; // Used to control PWM
 static int currCursorPosition[2]; // Track the specific location of the cursor
-							  // Index 0: row
-							  // Index 1: col
+								  // Index 0: row
+							  	  // Index 1: col
 
 /*** Simple Data Types ***/
 // Input Variables
@@ -72,7 +72,7 @@ static char MessageP2Start[] = // Scrolls "Player 2 - Place Ships" on Marquee di
 /**
  * If the number of rounds is greater than 0xF, an additional digit is included in MessageRoundStartEXT[]
  */
-static char MessageRoundStart[] = // Scrolls "Round _" on Marquee display in numRounds <= 0xF
+static char MessageRoundStart[] = // Scrolls "Round _" on Marquee display in numRounds <= 0xF // TODO make single message that reads Round 01 instead of Round 1 so that EXT is not needed
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_R, CHAR_O, CHAR_U, CHAR_N, CHAR_D, SPACE, UNDER, SPACE, DASH, SPACE, // UNDER (index 16) is replaced with round number
 	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
@@ -127,9 +127,16 @@ static moveResult currMoveResult = noResult; // Start with no moves made
 static displayState currDisplayState; // Toggle message (scroll) or board (play) display
 
 /*** Instances of Data Structures ***/
+
 	/* Functional Maps */
 // Board containing the cursor at a the proper location
 static bitMap cursorBoard = {
+	.horizontal_LEDMap = { 0 },
+	.vertical_LEDMap = { 0 }
+};
+
+// Composition of cursorBoard and gameBoard (the board pointed to by displayBoardPointer)
+static bitMap compBoard = {
 	.horizontal_LEDMap = { 0 },
 	.vertical_LEDMap = { 0 }
 };
@@ -174,8 +181,9 @@ static player playerTwo = {
 
 
 	/* Points to board to be displayed on 7SEG display */
+static bitMap* displayBoardPointer = &playerOne.ownMap; // The first board displayed is when player one places ships
 static bitMap* cursorBoardPointer = &cursorBoard;
-static bitMap* displayBoardPointer; // TODO ENSURE THIS IS INITIALIZED
+static bitMap* compBoardPointer = &compBoard;
 
 	///////////////////////////////////
 	////// Function Declarations //////
@@ -190,11 +198,11 @@ static bitMap* displayBoardPointer; // TODO ENSURE THIS IS INITIALIZED
 // Set message to be displayed
 	static void displayMessage(char *messageNamePointer, int messageLength, int scrollSpeed, int messageDelay, int holdDelay);
 // Determine & set position of cursor on board
-	static bitMap* buildCursorBoard(int hPot, int vPot, cursorOrient orient);
+	static void buildCursorBoard(int hPot, int vPot, cursorOrient orient);
 // Set cursor on game board
-	static bitMap* compileBoard(bitMap *cursorPointer, bitMap *boardPointer);
+	static void compileBoard(void);
 // Set a specific position on a map to a given LEDstate
-	static void assignIndex_LEDState(bitMap *currBoardPointer, char row, char col, cursorOrient orient, LEDstate state);
+	static void assignCursorPosition(char row, char col);
 // Prepare game board to be written to 7SEG display
 	static void drawBoard(bitMap *displayBoardPointer);
 // Set the positions of player's ships
@@ -289,7 +297,9 @@ void input(void) {
  */
 void logic (void) {
 
-	currGameState = test; // TODO delete
+	/* Prepare Game Board */
+	buildCursorBoard(potHorizontal_in, potVertical_in, currCursorOrient); // updates cursorBoard (cursorBoardPointer already points to cursorBoard)
+	compileBoard(cursorBoardPointer, displayBoardPointer);
 
 	switch (currGameState) {
 
@@ -315,6 +325,7 @@ void logic (void) {
 				outputMessage(); // Read player one start sequence
 				displayBoardPointer = &playerOne.ownMap;
 				currDisplayState = play; // allow player one to place ships
+
 			}
 
 			if (currMoveState == actionState) {
@@ -371,7 +382,7 @@ void logic (void) {
 						break; // law of superposition
 					}
 				} else { // cursor is vertical
-					if (playerTwo.ownMap->vertical_shipMap[ currCursorPosition[0] ][ currCursorPosition[0] ]) { // space already contains ship
+					if (playerTwo.ownMap->vertical_shipMap[ currCursorPosition[0] ][ currCursorPosition[1] ]) { // space already contains ship
 						break; // law of superposition
 					}
 				} // position is not occupied
@@ -512,11 +523,6 @@ void logic (void) {
 				currGameState = title;
 			}
 			break;
-
-		case test: // TODO delete
-			currDisplayState = play;
-			output();
-			break;
 	}
 
 	return;
@@ -526,8 +532,6 @@ void logic (void) {
  * Coordinate output of messages or game boards to 7SEG display
  */
 void outputMessage (void) {
-	/* Prepare Game Board */
-	displayBoardPointer = compileBoard(displayBoardPointer, cursorBoardPointer); // TODO make this work - somehow set the board to be displayed
 
 	/* Prepare Message Output */
 	switch (currGameState) {
@@ -648,11 +652,6 @@ void outputMessage (void) {
 
 
 			break;
-
-		case test: // TODO delete
-//			bitMap *cursorMap =
-			break;
-
 	}
 	return;
 }
@@ -685,7 +684,7 @@ void displayMessage(char *messageNamePointer, int messageLength, int scrollSpeed
  * moving through conditional checks to allow even ranges for the
  * potentiometers to sweep through for given positions
  */
-bitMap* buildCursorBoard(int hPot, int vPot, cursorOrient orient) {
+void buildCursorBoard(int hPot, int vPot, cursorOrient orient) {
 	char row, col;
 
 	/* Reset cursorBoard */
@@ -703,9 +702,8 @@ bitMap* buildCursorBoard(int hPot, int vPot, cursorOrient orient) {
 	} row = col = 0; // Reset row and col
 
 	if (orient == horizontalCursor) { // Determine horizontal-segment column & row to set cursorBoard with horizontal cursor
-								   	  	   //
-		if ( (currShipType == singleShip) // enables "super-speed mode" where program runs SOOO much faster when switch at PC0 is down
-									     //  because the loop passes one condition check earlier than if it is high
+
+		if ( (currShipType == singleShip)
 	    || (currGameState != playerOneStart && currGameState != playerTwoStart) ) {
 			// Lateral potentiometer positions
 				if (hPot < 512) { // Leftmost position = leftmost segment
@@ -734,8 +732,8 @@ bitMap* buildCursorBoard(int hPot, int vPot, cursorOrient orient) {
 					row = 2;
 				}
 
-			assignIndex_LEDState(cursorBoardPointer, row, col, horizontalCursor, cursorState);
-		} else if (currGameState == playerOneTurn || currGameState == playerTwoTurn) { // doubleShip cursor
+			assignCursorPosition(row, col);
+		} else if (currGameState == playerOneTurn || currGameState == playerTwoTurn) { // currShipType = doubleShip
 			/**
 			 * This block  will be set to the position of col & col+1 for double ship functionality.
 			 * Cursor integrity is guaranteed since the conditions to reach this block confirm that
@@ -766,8 +764,8 @@ bitMap* buildCursorBoard(int hPot, int vPot, cursorOrient orient) {
 					row = 2;
 				}
 
-			assignIndex_LEDState(cursorBoardPointer, row, col, horizontalCursor, cursorState);
-			assignIndex_LEDState(cursorBoardPointer, row, col+1, horizontalCursor, cursorState);
+			assignCursorPosition(row, col);
+			assignCursorPosition(row, col+1);
 		}
 
 
@@ -819,8 +817,8 @@ bitMap* buildCursorBoard(int hPot, int vPot, cursorOrient orient) {
 					row = 1;
 				}
 
-				assignIndex_LEDState(cursorBoardPointer, row, col, verticalCursor, cursorState);
-			} else {
+				assignCursorPosition(row, col);
+			} else { // currShipType = doubleShip
 				/**
 				 * This block  will be set to the position of col & col+1 for double ship functionality.
 				 * Cursor integrity is guaranteed since the conditions to reach this block confirm that
@@ -863,25 +861,25 @@ bitMap* buildCursorBoard(int hPot, int vPot, cursorOrient orient) {
 			//vertical movement
 				row = 0; // & 1 - the double ship must take up both vertical segments
 
-				assignIndex_LEDState(cursorBoardPointer, row, col, verticalCursor, cursorState);
-				assignIndex_LEDState(cursorBoardPointer, row+1, col, verticalCursor, cursorState);
+				assignCursorPosition(row, col);
+				assignCursorPosition(row+1, col);
 			}
 		}
 
 	currCursorPosition[0] = row;
 	currCursorPosition[1] = col;
-	return cursorBoardPointer;
+	return;
 }
 
 /**
  * Assign a specific location on a map with a given LED state
  */
-void assignIndex_LEDState(bitMap *board, char row, char col, cursorOrient orient, LEDstate state) {
+void assignCursorPosition(char row, char col) {
 
-	if (orient == horizontalCursor) {
-		board->horizontal_LEDMap[row][col] = state;
+	if (currCursorOrient == horizontalCursor) {
+		cursorBoardPointer->horizontal_LEDMap[row][col] = state;
 	} else {
-		board->vertical_LEDMap[row][col] = state;
+		cursorBoardPointer->vertical_LEDMap[row][col] = state;
 	}
 	return;
 }
@@ -889,34 +887,31 @@ void assignIndex_LEDState(bitMap *board, char row, char col, cursorOrient orient
 /**
  * Produce combined game board with cursor
  */
-bitMap compileBoard(bitMap* cursorBoardPointer, bitMap* boardBoardPointer) {
-	bitMap comp = {
-			.horizontal_LEDMap = { 0 },
-			.vertical_LEDMap = { 0 }
-	};
+void compileBoard() {
 
-	/* compile horizontal */
+	/* Compile Horizontal */
 	for (int row = 0; row < 3; row++) {
 		for (int col = 0; col < 8; col++) {
-			if (cursorPointer->horizontal_LEDMap[row][col] == blink) { // if the cursor is on the position
-				comp.horizontal_LEDMap[row][col] = cursorState;;
+			if (cursorBoardPointer->horizontal_LEDMap[row][col] == blink) { // if the cursor is on the position
+				compBoardPointer->horizontal_LEDMap[row][col] = cursorState;;
 			} else {
-				comp.horizontal_LEDMap[row][col] = board->horizontal_LEDMap[row][col]; // set comp board position to that of board
-			}
-		}
-	}
-	/* compile vertical */
-	for (int row = 0; row < 2; row++) {
-		for (int col = 0; col < 16; col++) {
-			if (cursorPointer->vertical_LEDMap[row][col] == blink) { // if the cursor is on the position
-				comp.vertical_LEDMap[row][col] = cursorState;;
-			} else {
-				comp.vertical_LEDMap[row][col] = board->vertical_LEDMap[row][col]; // set comp board position to that of board
+				compBoardPointer->horizontal_LEDMap[row][col] = gameBoardPointer->horizontal_LEDMap[row][col]; // set comp board position to that of board
 			}
 		}
 	}
 
-	return comp;
+	/* Compile Vertical */
+	for (int row = 0; row < 2; row++) {
+		for (int col = 0; col < 16; col++) {
+			if (cursorBoardPointer->vertical_LEDMap[row][col] == blink) { // if the cursor is on the position
+				compBoardPointer->vertical_LEDMap[row][col] = cursorState;;
+			} else {
+				compBoardPointer->vertical_LEDMap[row][col] = gameBoardPointer->vertical_LEDMap[row][col]; // set comp board position to that of board
+			}
+		}
+	}
+
+	return;
 }
 
 /**
@@ -1119,7 +1114,7 @@ void fireShot(player *playerPointer) {
 	/* Determine currMoveResult */
 	if (currCursorOrient == horizontalCursor) { // check cursor position against horizontal segments
 		if (playerPointer->opponentMap->horizontal_shipMap[ currCursorPosition[0] ][ currCursorPosition[1] ]) { // position hasShip
-			playerPointer->ownMap->horizontal_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] = targetHit; // bright
+			playerPointer->opponentMap->horizontal_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] = targetHit; // bright
 			currMoveResult = hitResult;
 			playerPointer->numHits++;
 
@@ -1129,17 +1124,17 @@ void fireShot(player *playerPointer) {
 		}
 	} else { // check cursor position against vertical segments
 		if (playerPointer->opponentMap->vertical_shipMap[ currCursorPosition[0] ][ currCursorPosition[1] ]) { // position hasShip
-			playerPointer->ownMap->vertical_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] = targetHit; // bright
+			playerPointer->opponentMap->vertical_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] = targetHit; // bright
 			currMoveResult = hitResult;
 			playerPointer->numHits++;
 		} else { // position isEmpty
-			playerPointer->ownMap->vertical_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] = targetMiss; // dim
+			playerPointer->opponentMap->vertical_LEDMap[ currCursorPosition[0] ][ currCursorPosition[1] ] = targetMiss; // dim
 			currMoveResult = missResult;
 		}
 	}
 
 	/* Update game board */
-	assignIndex_LEDState(&playerPointer->opponentMap, currCursorPosition[0], currCursorPosition[1], currCursorOrient, currMoveResult);
+	assignCursorPosition(&playerPointer->opponentMap, currCursorPosition[0], currCursorPosition[1], currCursorOrient, currMoveResult);
 
 	return;
 }
