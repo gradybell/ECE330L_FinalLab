@@ -1,7 +1,7 @@
 #include "battleship.h"
 
 /*******************************/
-/******   WORKING NOTES   ******/
+/****** WORKING NOTES   ******/
 /*******************************/
 
 	//////////////////////////////////
@@ -13,67 +13,55 @@ static int currCursorPosition[2]; // Track the specific location of the cursor
 							  // Index 0: row
 							  // Index 1: col
 
-/*** Delay Variables to be used in HAL_Delay ***/
-extern int pushButton_delay = 300;
-extern int displayHold_delay = 1000;
-extern int scrollSpeed_norm = 150;
-extern int scrollSpeed_fast = 100;
-extern int titleScroll_delay = 3300;
-extern int recapScroll_delay = 8000;
-extern int playerStartScroll_delay = 10000;
-extern int roundScroll_delay = 2000;
-extern int extRoundScroll_delay = 2100;
-extern int moveScroll_delay = 1800;
-extern int winnerScroll_delay = 5000;
-extern int endGameScroll_delay = 10000;
-
 /*** Simple Data Types ***/
 // Input Variables
-int actionButton_in = 0; // Push button 10 (PC10) used to execute action (place boat & fire)
-int toggleButton_in = 0; // Push button 11 (PC11) used to toggle cursor between horizontal (0) and vertical (1)
-int shipTypeSwitch_in = 0; // switch 8 (PC0) used to switch from 1 space (0) to 2 space (1) ships when placing
-int potHorizontal_in = 0; // Potentiometer (PA1) used to control horizontal cursor movement
-int potVertical_in = 0; // Potentiometer (PA2) used to control vertical cursor movement
+static int actionButton_in = 0; // Push button 10 (PC10) used to execute action (place boat & fire)
+static int toggleButton_in = 0; // Push button 11 (PC11) used to toggle cursor between horizontal (0) and vertical (1)
+static int shipTypeSwitch_in = 0; // switch 8 (PC0) used to switch from 1 space (0) to 2 space (1) ships when placing
+static int potHorizontal_in = 0; // Potentiometer (PA1) used to control horizontal cursor movement
+static int potVertical_in = 0; // Potentiometer (PA2) used to control vertical cursor movement
 
 // Logic Variables
-bool playerOneShipsPlaced = false; // Track when player one finishes placing ships
-bool playerTwoShipsPlaced = false; // Track when player two finishes placing ships
-char numRounds = 0; // Track number of rounds played
-bool playAgain = false; // Detect if player wants to play again
-bool firstGame = true; // Detect if this is the first game played
+static bool playerOneShipsPlaced = false; // Track when player one finishes placing ships
+static bool playerTwoShipsPlaced = false; // Track when player two finishes placing ships
+static char numRounds = 0; // Track number of rounds played
+static bool playAgain = false; // Detect if player wants to play again
+static bool firstGame = true; // Detect if this is the first game played
 
 // Output Variables
-char displayRound_0th = 0x0; // The 0th position of the number of rounds played
-char displayRound_1st = 0x0; // The 1st position of the number of rounds played
+static char displayRound_0th = 0x0; // The 0th position of the number of rounds played
+static char displayRound_1st = 0x0; // The 1st position of the number of rounds played
 
 /*** Marquee Messages ***/
-char MessageTitle[] = // Scrolls "Battleship" on Marquee display
+static char MessageTitle[] = // Scrolls "Battleship" on Marquee display
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_B, CHAR_A, CHAR_T, CHAR_T, CHAR_L, CHAR_E,
 	 CHAR_S, CHAR_H, CHAR_I, CHAR_P,
 	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 
-char MessageP1Recap[] = // Scrolls "Player 1 - _ Wins" on Marquee display
+static char MessageP1Recap[] = // Scrolls "Player 1 - _ Wins" on Marquee display
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
 	 CHAR_1, SPACE, DASH, SPACE,
 	 UNDER, SPACE, CHAR_W, CHAR_I, CHAR_N, CHAR_S, // UNDER (index 21) is replaced with number of P1 wins
 	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
-char MessageP2Recap[] = // Scrolls "Player 2 - _ Wins" on Marquee display
+
+static char MessageP2Recap[] = // Scrolls "Player 2 - _ Wins" on Marquee display
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
 	 CHAR_2, SPACE, DASH, SPACE,
 	 UNDER, SPACE, CHAR_W, CHAR_I, CHAR_N, CHAR_S, // UNDER (index 21) is replaced with number of P2 wins
 	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 
-char MessageP1Start[] = // Scrolls "Player 1 - Place Ships" on Marquee display
+static char MessageP1Start[] = // Scrolls "Player 1 - Place Ships" on Marquee display
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
 	 CHAR_1, SPACE, DASH, SPACE,
 	 CHAR_P, CHAR_L, CHAR_A, CHAR_C, CHAR_E, SPACE,
 	 CHAR_S, CHAR_H, CHAR_I, CHAR_P, CHAR_S,
 	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
-char MessageP2Start[] = // Scrolls "Player 2 - Place Ships" on Marquee display
+
+static char MessageP2Start[] = // Scrolls "Player 2 - Place Ships" on Marquee display
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
 	 CHAR_2, SPACE, DASH, SPACE,
@@ -84,144 +72,88 @@ char MessageP2Start[] = // Scrolls "Player 2 - Place Ships" on Marquee display
 /**
  * If the number of rounds is greater than 0xF, an additional digit is included in MessageRoundStartEXT[]
  */
-char MessageRoundStart[] = // Scrolls "Round _" on Marquee display in numRounds <= 0xF
+static char MessageRoundStart[] = // Scrolls "Round _" on Marquee display in numRounds <= 0xF
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_R, CHAR_O, CHAR_U, CHAR_N, CHAR_D, SPACE, UNDER, SPACE, DASH, SPACE, // UNDER (index 16) is replaced with round number
 	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
-char MessageRoundStartEXT[] = // Scrolls "Round __" on Marquee display if numRounds > 0xF
+
+static char MessageRoundStartEXT[] = // Scrolls "Round __" on Marquee display if numRounds > 0xF
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_R, CHAR_O, CHAR_U, CHAR_N, CHAR_D, SPACE, UNDER, UNDER, SPACE, DASH, SPACE, // UNDER (index 16 & 17) is replaced with round numbers
 	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE, CHAR_1,
 	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 
-char MessageP1Turn[] = // Scrolls "Player 1" on Marquee display
+static char MessageP1Turn[] = // Scrolls "Player 1" on Marquee display
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE, CHAR_1,
 	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
-char MessageP2Turn[] = // Scrolls "Player 2" on Marquee display
+
+static char MessageP2Turn[] = // Scrolls "Player 2" on Marquee display
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE, CHAR_2,
 	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 
-char MessageHit[] = // Scrolls "HIT" on Marquee display
+static char MessageHit[] = // Scrolls "HIT" on Marquee display
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_H, CHAR_I, CHAR_T,
 	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
-char MessageMiss[] = // Scrolls "MISS" on Marquee display
+
+static char MessageMiss[] = // Scrolls "MISS" on Marquee display
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_M, CHAR_I, CHAR_S, CHAR_S,
 	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 
-char MessageP1Wins[] = // Scrolls "Player 1 Wins" on Marquee display
+static char MessageP1Wins[] = // Scrolls "Player 1 Wins" on Marquee display
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
 	 CHAR_1, SPACE,
 	 CHAR_W, CHAR_I, CHAR_N, CHAR_S,
 	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
-char MessageP2Wins[] = // Scrolls "Player 2 Wins" on Marquee display
+
+static char MessageP2Wins[] = // Scrolls "Player 2 Wins" on Marquee display
 	{SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,
 	 CHAR_P, CHAR_L, CHAR_A, CHAR_Y, CHAR_E, CHAR_R, SPACE,
 	 CHAR_2, SPACE,
 	 CHAR_W, CHAR_I, CHAR_N, CHAR_S,
 	 SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE,SPACE};
 
-/*** Enumerated variables ***/
-typedef enum gameState {title = 0, roundStart = 1, playerOneStart = 2, playerTwoStart = 3,
-						playerOneTurn = 4, playerTwoTurn = 5, endGame = 6} gameState; // represents all states the game can be in
-						gameState currGameState = title; // start the game at the title sequence
+/*** Instances of Enumerated Variables ***/
+static gameState currGameState = title; // Start the game at the title sequence
+static LEDstate cursorState = blink; // The cursor will always blink
+static cursorOrient currCursorOrient = horizontalCursor; // Start the cursor in a horizontal orientation
+static shipType currShipType = singleShip; // Start with a single ship
+static moveState currMoveState = idleState; // Store the state of the current move
+static moveResult currMoveResult = noResult; // Start with no moves made
+static displayState currDisplayState; // Toggle message (scroll) or board (play) display
 
-typedef enum LEDstate {off = 0, targetMiss = 1, targetHit = 2, blink = 3} LEDstate;
-					   LEDstate cursorState = blink; // She cursor will always blink
-
-typedef enum positionState {isEmpty = false, hasShip = true} positionState;
-
-typedef enum cursorOrient {horizontalCursor = 0, verticalCursor = 1} cursorOrient;
-				   	       cursorOrient currCursorOrient = horizontalCursor; // Start the cursor in a horizontal orientation
-
-typedef enum shipType {singleShip = 0, doubleShip = 1} shipType;
-					   shipType currShipType = singleShip; // Start with a single ship
-
-typedef enum moveState {idleState = 0, actionState = 1} moveState;
-					 	moveState currMoveState = idleState; // Store the state of the current move
-
-typedef enum moveResult {noResult = 0, missResult = 1, hitResult = 2} moveResult;
-						 moveResult currMoveResult = noResult; // Start with no moves made
-
-typedef enum displayState {scroll = 0, play = 1} displayState;
-						   displayState currDisplayState; // Toggle message (scroll) or board (play) display
-
-/*** Data structures ***/
-/**
- * Bitmaps are composed of horizontal and vertical components and track hits and misses on the board
- * as well as the cursor position
- */
-typedef struct {
-	LEDstate horizontal_LEDMap[3][8]; // This array displays the player's horizontal hits and misses
-	LEDstate vertical_LEDMap[2][16]; // This array displays the player's vertical hits and misses
-	positionState horizontal_shipMap[3][8]; // This array holds the position of a player's horizontal ships
-	positionState vertical_shipMap[2][16]; // This array holds the position of a player's vertical ships
-} bitMap;
-
-/**
- * Players have their own board that they place boats on & an opponent board that they try to sink the ships on
- */
-typedef struct {
-	bitMap *ownMap; // Points to board with their own ships
-	bitMap *opponentMap; // Points to board with their opponent's ships
-	char doubleBoatProperties[2][3]; // Track details about the two double boats
-									 // The second half of the ship is at row+1 if vertical, col+1 if horizontal
-									 /* Boat 1 [0][i] */
-										 //	i=0: horizontal (0) or vertical (1)
-										 //	i=1: row
-										 //	i=2: col
-									 /* Boat 2 [1][i] */
-										 //	i=0: horizontal (0) or vertical (1)
-										 //	i=1: row
-										 //	i=2: col
-	char singleBoatsRemaining; // Track number of remaining single-spaced boats
-	char doubleBoatsRemaining; // Track number of remaining double-spaced boats
-	char numHits; // Track total number of hits
-	char numWins; // Track total number of wins
-} player;
-
-/*** Instances of maps ***/
-static bitMap cursorBoard = { // store game board with the position of the cursor
-		.horizontal_LEDMap = { 0 },
-		.vertical_LEDMap = { 0 }
+/*** Instances of Data Structures ***/
+	/* Functional Maps */
+// Board containing the cursor at a the proper location
+static bitMap cursorBoard = {
+	.horizontal_LEDMap = { 0 },
+	.vertical_LEDMap = { 0 }
 };
 
-// Player One
-bitMap playerOneShips = {
+	/* Ship Maps */
+// Player One Ships Map
+static bitMap playerOneShips = {
 	.horizontal_LEDMap = { 0 },
 	.vertical_LEDMap = { 0 },
 	.horizontal_shipMap = { 0 },
 	.vertical_shipMap = { 0 },
-//
-//	.horizontal_LEDMap = {
-//		{ targetMiss, off, off, targetMiss, targetMiss, off, off, off },
-//		{ targetMiss, off, off, targetHit, targetHit, off, off, off },
-//		{ targetMiss, off, off, blink, blink, off, off, off },
-//	},
-//
-//	.vertical_LEDMap = {
-// 		{ off, targetHit, targetHit, off, off, targetMiss, targetMiss, off,
-// 		  targetHit, targetMiss, targetHit, blink, targetHit, targetHit, targetMiss, targetMiss },
-//
-//	   { off, targetHit, targetHit, off, off, targetMiss, targetMiss, off,
-//	     targetHit, off, off, blink, targetHit, targetHit, targetMiss, targetMiss },
-//	}
 };
-// Player Two
-bitMap playerTwoShips = {
+
+// Player Two Ship Map
+static bitMap playerTwoShips = {
 	.horizontal_LEDMap = { 0 },
 	.vertical_LEDMap = { 0 },
 	.horizontal_shipMap = { 0 },
 	.vertical_shipMap = { 0 }
 };
 
-/*** Instance of players ***/
+	/* Players */
 // Player One
-player playerOne = {
+static player playerOne = {
 	.ownMap = &playerOneShips,
 	.opponentMap = &playerTwoShips,
 	.singleBoatsRemaining = 0, // Increment as ships are placed, decrement as ships are sunk
@@ -229,8 +161,9 @@ player playerOne = {
 	.numHits = 0,
 	.numWins = 0
 };
+
 // Player Two
-player playerTwo = {
+static player playerTwo = {
 	.ownMap = &playerTwoShips,
 	.opponentMap = &playerOneShips,
 	.singleBoatsRemaining = 0, // Increment as ships are placed, decrement as ships are sunk
@@ -239,36 +172,53 @@ player playerTwo = {
 	.numWins = 0
 };
 
+
+	/* Points to board to be displayed on 7SEG display */
+static bitMap* cursorBoardPointer = &cursorBoard;
+static bitMap* displayBoardPointer; // TODO ENSURE THIS IS INITIALIZED
+
 	///////////////////////////////////
 	////// Function Declarations //////
 	///////////////////////////////////
 
 // Process inputs
-void input (void);
+	static void input (void);
 // Interpret inputs & coordinate outputs
-void logic (void);
+	static void logic (void);
 // Determine message to be written to 7SEG display
-void outputMessage (void);
+	static void outputMessage (void);
 // Set message to be displayed
-void displayMessage(char *messageNamePointer, int messageLength, int scrollSpeed, int messageDelay, int holdDelay);
+	static void displayMessage(char *messageNamePointer, int messageLength, int scrollSpeed, int messageDelay, int holdDelay);
 // Determine & set position of cursor on board
-bitMap* buildCursorBoard(int hPot, int vPot, enum cursorOrient orient);
+	static bitMap* buildCursorBoard(int hPot, int vPot, cursorOrient orient);
 // Set cursor on game board
-bitMap* compileBoard(bitMap *cursorPointer, bitMap *boardPointer);
+	static bitMap* compileBoard(bitMap *cursorPointer, bitMap *boardPointer);
 // Set a specific position on a map to a given LEDstate
-void assignIndex_LEDState(bitMap *currBoardPointer, char row, char col, cursorOrient orient, LEDstate state);
+	static void assignIndex_LEDState(bitMap *currBoardPointer, char row, char col, cursorOrient orient, LEDstate state);
 // Prepare game board to be written to 7SEG display
-void drawBoard(bitMap *currDisplayBoardPointer);
+	static void drawBoard(bitMap *displayBoardPointer);
 // Set the positions of player's ships
-void placeShip(player *playerPointer);
+	static void placeShip(player *playerPointer);
 // Make move
-void fireShot(player *playerPointer);
+	static void fireShot(player *playerPointer);
 // Prepare the game to be played again
-void resetGame(void);
+	static void resetGame(void);
 
 	//////////////////////////////////
 	////// Function Definitions //////
 	//////////////////////////////////
+
+/**
+ * Loop through input reading and game logic
+ */
+void game(void) {
+
+	while(1) {
+		  input(); // process inputs for logic
+		  logic(); // coordinate game flow & toggle message or board display
+	}
+	return; // should not reach
+}
 
 /**
  * Provide timer variable for PWM and refresh 7SEG display map
@@ -277,7 +227,7 @@ void handle_interrupts (void) {
 
 	timer++;
 	if (currDisplayState == play) {
-		drawBoard(&currDisplayBoard); // Refresh game board
+		drawBoard(displayBoardPointer); // Refresh game board
 	}
 
 	return;
@@ -294,20 +244,20 @@ void input(void) {
 	/* Lock in action trigger */
 	if (actionButton_in == 0) {
 		currMoveState = actionState;
-		HAL_Delay(pushButton_delay);
+		HAL_Delay(PUSHBUTTON_DELAY);
 	} else {
 		currMoveState = idleState;
-		HAL_Delay(pushButton_delay);
+		HAL_Delay(PUSHBUTTON_DELAY);
 	}
 
 	/* Toggle orientation of cursor */
 	if (toggleButton_in == 0) {
 		if (currCursorOrient == verticalCursor) { // The cursor is horizontal
 			currCursorOrient = horizontalCursor;
-			HAL_Delay(pushButton_delay);
+			HAL_Delay(PUSHBUTTON_DELAY);
 		} else {
 			currCursorOrient = verticalCursor;
-			HAL_Delay(pushButton_delay);
+			HAL_Delay(PUSHBUTTON_DELAY);
 		}
 	}
 
@@ -339,6 +289,8 @@ void input(void) {
  */
 void logic (void) {
 
+	currGameState = test; // TODO delete
+
 	switch (currGameState) {
 
 	/**
@@ -361,7 +313,7 @@ void logic (void) {
 			// enter on first pass from case "title"
 			if (currDisplayState == scroll) {
 				outputMessage(); // Read player one start sequence
-				currDisplayBoard = &playerOne.ownMap;
+				displayBoardPointer = &playerOne.ownMap;
 				currDisplayState = play; // allow player one to place ships
 			}
 
@@ -402,9 +354,9 @@ void logic (void) {
 	 */
 		case playerTwoStart:
 			// enter on first pass after case "playerOneStart"
-			if (currDisplayState = scroll) {
+			if (currDisplayState == scroll) {
 				outputMessage(); // Read player two start sequence
-				currDisplayBoard = &playerTwo.ownMap;
+				displayBoardPointer = &playerTwo.ownMap;
 				currDisplayState = play; // allow player two to place ships
 			}
 
@@ -459,9 +411,9 @@ void logic (void) {
 			currMoveResult = noResult; // reset for turn
 
 			// enter on first pass after case "roundStart"
-			if (currDisplayState = scroll) {
+			if (currDisplayState == scroll) {
 				outputMessage(); // Read player one move sequence
-				currDisplayBoard = &playerOne.opponentMap;
+				displayBoardPointer = &playerOne.opponentMap;
 				currDisplayState = play; // allow player one to make move
 			}
 
@@ -503,9 +455,9 @@ void logic (void) {
 			currMoveResult = noResult; // reset for turn
 
 			// enter on first pass after case "playerOneTurn"
-			if (currDisplayState = scroll) {
+			if (currDisplayState == scroll) {
 				outputMessage(); // Read player two move sequence
-				currDisplayBoard = &playerTwo.opponentMap;
+				displayBoardPointer= &playerTwo.opponentMap;
 				currDisplayState = play; // allow player two to make move
 			}
 
@@ -560,6 +512,11 @@ void logic (void) {
 				currGameState = title;
 			}
 			break;
+
+		case test: // TODO delete
+			currDisplayState = play;
+			output();
+			break;
 	}
 
 	return;
@@ -570,8 +527,7 @@ void logic (void) {
  */
 void outputMessage (void) {
 	/* Prepare Game Board */
-	bitMap cursorBoard = buildCursorBoard(potHorizontal_in, potVertical_in, currCursorOrient);
-	*currDisplayBoard = compileBoard( &currDisplayBoard, cursorBoard ); // TODO make this work - somehow set the board to be displayed
+	displayBoardPointer = compileBoard(displayBoardPointer, cursorBoardPointer); // TODO make this work - somehow set the board to be displayed
 
 	/* Prepare Message Output */
 	switch (currGameState) {
@@ -579,14 +535,14 @@ void outputMessage (void) {
 		case title:
 			/* Display Game Title */
 			if (currDisplayState == scroll) {
-				displayMessage(MessageTitle, sizeof(MessageTitle), scrollSpeed_norm, titleScroll_delay, displayHold_delay);
+				displayMessage(MessageTitle, sizeof(MessageTitle), SCROLLSPEED_NORM, TITLESCROLL_DELAY, DISPLAYHOLD_DELAY);
 
 				if (!firstGame) {
 					MessageP1Recap[21] = playerOne.numWins;
-					displayMessage(MessageP1Recap, sizeof(MessageP1Recap), scrollSpeed_norm, recapScroll_delay, displayHold_delay);
+					displayMessage(MessageP1Recap, sizeof(MessageP1Recap), SCROLLSPEED_NORM, RECAPSCROLL_DELAY, DISPLAYHOLD_DELAY);
 
 					MessageP2Recap[21] = playerTwo.numWins;
-					displayMessage(MessageP2Recap, sizeof(MessageP2Recap), scrollSpeed_norm, recapScroll_delay, displayHold_delay);
+					displayMessage(MessageP2Recap, sizeof(MessageP2Recap), SCROLLSPEED_NORM, RECAPSCROLL_DELAY, DISPLAYHOLD_DELAY);
 				} // TODO could add instruction message if it is the first game
 			}
 
@@ -595,7 +551,7 @@ void outputMessage (void) {
 		case playerOneStart:
 			/* Display Player One Start Screen*/
 			if (currDisplayState == scroll) {
-				displayMessage(MessageP1Start, sizeof(MessageP1Start), scrollSpeed_norm, playerStartScroll_delay, displayHold_delay);
+				displayMessage(MessageP1Start, sizeof(MessageP1Start), SCROLLSPEED_NORM, PLAYERSTARTSCROLL_DELAY, DISPLAYHOLD_DELAY);
 			}
 
 			break;
@@ -603,7 +559,7 @@ void outputMessage (void) {
 		case playerTwoStart:
 			/* Display Player Two Start Screen*/
 			if (currDisplayState == scroll) {
-				displayMessage(MessageP2Start, sizeof(MessageP2Start), scrollSpeed_norm, playerStartScroll_delay, displayHold_delay);
+				displayMessage(MessageP2Start, sizeof(MessageP2Start), SCROLLSPEED_NORM, PLAYERSTARTSCROLL_DELAY, DISPLAYHOLD_DELAY);
 			}
 
 			break;
@@ -617,13 +573,13 @@ void outputMessage (void) {
 				 */
 				if(numRounds <= 0xF) {
 					MessageRoundStart[16] = displayRound_0th; // update round number (0th position)
-					displayMessage(MessageRoundStart, sizeof(MessageRoundStart), scrollSpeed_fast, roundScroll_delay, displayHold_delay);
+					displayMessage(MessageRoundStart, sizeof(MessageRoundStart), SCROLLSPEED_FAST, ROUNDSCROLL_DELAY, DISPLAYHOLD_DELAY);
 
 				} else {
 					displayRound_1st = (numRounds>>4) & 0xF; // include hex char 1 of numRounds if numRounds > 15
 					MessageRoundStartEXT[17] = displayRound_0th; // update round number (0th position)
 					MessageRoundStartEXT[16] = displayRound_1st; // update round number (1st position)
-					displayMessage(MessageRoundStartEXT, sizeof(MessageRoundStartEXT), scrollSpeed_fast, extRoundScroll_delay, displayHold_delay);
+					displayMessage(MessageRoundStartEXT, sizeof(MessageRoundStartEXT), SCROLLSPEED_FAST, EXTROUNDSCROLL_DELAY, DISPLAYHOLD_DELAY);
 				}
 			}
 			break;
@@ -636,15 +592,15 @@ void outputMessage (void) {
 				switch(currMoveResult) {
 
 					case noResult: // move has not been made yet
-						displayMessage(MessageP1Turn, sizeof(MessageP1Turn), scrollSpeed_norm, roundScroll_delay, displayHold_delay);
+						displayMessage(MessageP1Turn, sizeof(MessageP1Turn), SCROLLSPEED_FAST, EXTROUNDSCROLL_DELAY, DISPLAYHOLD_DELAY);
 						break;
 
 					case hitResult:
-						displayMessage(MessageHit, sizeof(MessageHit), scrollSpeed_fast, moveScroll_delay, displayHold_delay);
+						displayMessage(MessageHit, sizeof(MessageHit), SCROLLSPEED_FAST, MOVESCROLL_DELAY, DISPLAYHOLD_DELAY);
 						break;
 
 					case missResult:
-						displayMessage(MessageMiss, sizeof(MessageMiss), scrollSpeed_fast, moveScroll_delay, displayHold_delay);
+						displayMessage(MessageMiss, sizeof(MessageMiss), SCROLLSPEED_FAST, MOVESCROLL_DELAY, DISPLAYHOLD_DELAY);
 						break;
 				}
 			}
@@ -660,15 +616,15 @@ void outputMessage (void) {
 				switch(currMoveResult) {
 
 					case noResult:
-						displayMessage(MessageP2Turn, sizeof(MessageP2Turn), scrollSpeed_fast, roundScroll_delay, displayHold_delay);
+						displayMessage(MessageP2Turn, sizeof(MessageP2Turn), SCROLLSPEED_FAST, EXTROUNDSCROLL_DELAY, DISPLAYHOLD_DELAY);
 						break;
 
 					case hitResult:
-						displayMessage(MessageHit, sizeof(MessageHit), scrollSpeed_fast, moveScroll_delay, displayHold_delay);
+						displayMessage(MessageHit, sizeof(MessageHit), SCROLLSPEED_FAST, MOVESCROLL_DELAY, DISPLAYHOLD_DELAY);
 						break;
 
 					case missResult:
-						displayMessage(MessageMiss, sizeof(MessageMiss), scrollSpeed_fast, moveScroll_delay, displayHold_delay);
+						displayMessage(MessageMiss, sizeof(MessageMiss), SCROLLSPEED_FAST, MOVESCROLL_DELAY, DISPLAYHOLD_DELAY);
 						break;
 				}
 			}
@@ -682,30 +638,23 @@ void outputMessage (void) {
 			/* Display Game End Screen*/
 			if (currDisplayState == scroll) {
 				if (playerOne.numHits == 7) { // player one won
-					displayMessage(MessageP1Wins, sizeof(MessageP1Wins), scrollSpeed_norm, winnerScroll_delay, displayHold_delay);
+					displayMessage(MessageP1Wins, sizeof(MessageP1Wins), SCROLLSPEED_NORM, WINNERSCROLL_DELAY, DISPLAYHOLD_DELAY);
 
 				} else { // player two won
-					displayMessage(MessageP2Wins, sizeof(MessageP2Wins), scrollSpeed_norm, winnerScroll_delay, displayHold_delay);
+					displayMessage(MessageP2Wins, sizeof(MessageP2Wins), SCROLLSPEED_NORM, WINNERSCROLL_DELAY, DISPLAYHOLD_DELAY);
 				}
 			}
 
 
 
 			break;
+
+		case test: // TODO delete
+//			bitMap *cursorMap =
+			break;
+
 	}
 	return;
-}
-
-/**
- * Loop through input reading and game logic
- */
-void game(void) {
-
-	while(1) {
-		  input(); // process inputs for logic
-		  logic(); // coordinate game flow & toggle message or board display
-	}
-	return; // should not reach
 }
 
 	/////////////////////////////////
@@ -736,33 +685,29 @@ void displayMessage(char *messageNamePointer, int messageLength, int scrollSpeed
  * moving through conditional checks to allow even ranges for the
  * potentiometers to sweep through for given positions
  */
-bitMap* buildCursorBoard(int hPot, int vPot, enum cursorOrient orient) {
-
-	static bitMap *cursorBoardPointer = &cursorBoard; // points to cursorBoard
+bitMap* buildCursorBoard(int hPot, int vPot, cursorOrient orient) {
 	char row, col;
 
-	//clear horizontal segments of cursorBoard
+	/* Reset cursorBoard */
+	// Clear horizontal segments of cursorBoard
 	for (row = 0; row < 3; row++) {
 		for (col = 0; col < 8; col++) {
 			cursorBoard.horizontal_LEDMap[row][col] = off;
 		}
 	}
-	//clear vertical segments of cursorBoard
+	// Clear vertical segments of cursorBoard
 	for (row = 0; row < 2; row++) {
 		for (col = 0; col < 16; col++) {
 			cursorBoard.vertical_LEDMap[row][col] = off;
 		}
-	} row = col = 0;
+	} row = col = 0; // Reset row and col
 
-	/* Determine column & row */
-	if (orient == horizontalCursor) { // horizontal segments
-		/**
-		 * This block sets a single cursor blinking
-		 */
-		if (currShipType == singleShip // enables "superspeed mode" where program runs SOOO much faster in switch at PC0 is down
-									   // because the loop enters one condition check earlier than if it is high
+	if (orient == horizontalCursor) { // Determine horizontal-segment column & row to set cursorBoard with horizontal cursor
+								   	  	   //
+		if ( (currShipType == singleShip) // enables "super-speed mode" where program runs SOOO much faster when switch at PC0 is down
+									     //  because the loop passes one condition check earlier than if it is high
 	    || (currGameState != playerOneStart && currGameState != playerTwoStart) ) {
-			//Horizontal movement
+			// Lateral potentiometer positions
 				if (hPot < 512) { // Leftmost position = leftmost segment
 					col = 0;
 				} else if (hPot < 1024) {
@@ -780,22 +725,23 @@ bitMap* buildCursorBoard(int hPot, int vPot, enum cursorOrient orient) {
 				} else { // Rightmost position = rightmost segment
 					col = 7;
 				}
-			//Vertical movement
+			// Longitudinal potentiometer positions
 				if (vPot < 1365) { // Left position = top
 					row = 0;
-				} else if (vPot < 2730) { // middle position = middle
+				} else if (vPot < 2730) { // Middle position = middle
 					row = 1;
-				} else { // right position = bottom
+				} else { // Right position = bottom
 					row = 2;
 				}
 
 			assignIndex_LEDState(cursorBoardPointer, row, col, horizontalCursor, cursorState);
-		} else {
+		} else if (currGameState == playerOneTurn || currGameState == playerTwoTurn) { // doubleShip cursor
 			/**
-			 * This block  will be set to the position of col & col+1 for double ship functionality
-			 * since it is
+			 * This block  will be set to the position of col & col+1 for double ship functionality.
+			 * Cursor integrity is guaranteed since the conditions to reach this block confirm that
+			 * one of the players is placing a ship (and the shipType is doubleShip)
 			 */
-			//horizontal movement
+			// Lateral potentiometer positions (tuned to 7 divisions)
 				if (hPot < 585) { // Leftmost position = leftmost segment
 					col = 0; // & 1
 				} else if (hPot < 1170) {
@@ -811,7 +757,7 @@ bitMap* buildCursorBoard(int hPot, int vPot, enum cursorOrient orient) {
 				} else { // rightmost position = rightmost segment
 					col = 6; // & 7
 				}
-			//vertical movement functionality is unchanged
+			// Longitudinal potentiometer positions are unchanged
 				if (vPot < 1365) { // Left position = top
 					row = 0;
 				} else if (vPot < 2730) { // middle position = middle
@@ -825,10 +771,14 @@ bitMap* buildCursorBoard(int hPot, int vPot, enum cursorOrient orient) {
 		}
 
 
-	} else { // vertical segments
-		if (currGameState == playerOneStart || currGameState == playerTwoStart) {
-			if (currShipType == singleShip) {
-			//horizontal movement
+	} else { // Determine vertical-segment column & row to set cursorBoard with vertical cursor
+		/**
+		 * This block sets a single cursor blinking
+		 */								   //
+		if ( (currShipType == singleShip) // enables "super-speed mode" where program runs SOOO much faster when switch at PC0 is down
+										 //  because the loop enters one condition check earlier than if it is high
+		|| (currGameState != playerOneStart && currGameState != playerTwoStart) ) {
+			// Horizontal segment positions are unchanged
 				if (hPot < 256) { // Leftmost position = leftmost segment
 					col = 0;
 				} else if (hPot < 512) {
@@ -872,9 +822,11 @@ bitMap* buildCursorBoard(int hPot, int vPot, enum cursorOrient orient) {
 				assignIndex_LEDState(cursorBoardPointer, row, col, verticalCursor, cursorState);
 			} else {
 				/**
-				 * For double ships, the cursor will be set to the position of row & row+1
+				 * This block  will be set to the position of col & col+1 for double ship functionality.
+				 * Cursor integrity is guaranteed since the conditions to reach this block confirm that
+				 * one of the players is placing a ship (and the shipType is doubleShip)
 				 */
-			//horizontal movement functionality is unchanged
+			// Horizontal movement functionality is unchanged
 				if (hPot < 256) { // Leftmost position = leftmost segment
 					col = 0;
 				} else if (hPot < 512) {
@@ -915,7 +867,6 @@ bitMap* buildCursorBoard(int hPot, int vPot, enum cursorOrient orient) {
 				assignIndex_LEDState(cursorBoardPointer, row+1, col, verticalCursor, cursorState);
 			}
 		}
-	}
 
 	currCursorPosition[0] = row;
 	currCursorPosition[1] = col;
@@ -925,7 +876,7 @@ bitMap* buildCursorBoard(int hPot, int vPot, enum cursorOrient orient) {
 /**
  * Assign a specific location on a map with a given LED state
  */
-void assignIndex_LEDState(char row, char col, bitMap *board, cursorOrient orient, LEDstate state) {
+void assignIndex_LEDState(bitMap *board, char row, char col, cursorOrient orient, LEDstate state) {
 
 	if (orient == horizontalCursor) {
 		board->horizontal_LEDMap[row][col] = state;
@@ -938,7 +889,7 @@ void assignIndex_LEDState(char row, char col, bitMap *board, cursorOrient orient
 /**
  * Produce combined game board with cursor
  */
-bitMap compileBoard(bitMap *cursorPointer, bitMap *boardPointer) {
+bitMap compileBoard(bitMap* cursorBoardPointer, bitMap* boardBoardPointer) {
 	bitMap comp = {
 			.horizontal_LEDMap = { 0 },
 			.vertical_LEDMap = { 0 }
@@ -1188,7 +1139,7 @@ void fireShot(player *playerPointer) {
 	}
 
 	/* Update game board */
-	assignIndex_LEDState(currCursorPosition[0], currCursorPosition[1], &playerPointer->opponentMap, currCursorOrient, currMoveResult);
+	assignIndex_LEDState(&playerPointer->opponentMap, currCursorPosition[0], currCursorPosition[1], currCursorOrient, currMoveResult);
 
 	return;
 }
