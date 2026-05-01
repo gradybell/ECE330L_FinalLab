@@ -7,7 +7,7 @@
 #include <stdbool.h>
 
 /*** Constant Macros ***/
-#define PUSHBUTTON_DELAY 300
+#define PUSHBUTTON_DELAY 100
 #define SCROLLSPEED_NORM 150
 #define SCROLLSPEED_FAST 100
 #define DISPLAYHOLD_DELAY 1000
@@ -35,8 +35,8 @@ typedef enum {
 
 typedef enum { // TODO could be cool to have "sunk" state
 	off = 0,
-	targetMiss = 1, // Dim
-	targetHit = 2, // Bright
+	dim = 1, // target miss
+	bright = 2, // ship placed OR target hit
 	blink = 3 // Cursor
 } LEDstate; /* All states a board position can be in */
 
